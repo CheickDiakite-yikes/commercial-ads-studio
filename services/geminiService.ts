@@ -1,15 +1,6 @@
 import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
 import { AspectRatio, ProjectSettings, ReferenceFile, TTSVoice } from "../types";
 
-let genAI: GoogleGenAI | null = null;
-let currentApiKey: string | null = null;
-
-export const initializeGemini = (apiKey: string) => {
-  genAI = new GoogleGenAI({ apiKey });
-  currentApiKey = apiKey;
-  console.log("Gemini initialized.");
-};
-
 // --- AUDIO UTILITIES (PCM to WAV) ---
 
 const writeString = (view: DataView, offset: number, string: string) => {
@@ -73,7 +64,7 @@ const adPlanSchema: Schema = {
     title: { type: Type.STRING },
     concept: { type: Type.STRING },
     musicMood: { type: Type.STRING },
-    fullScript: { type: Type.STRING, description: "A cohesive, timing-aware voiceover script for the entire 30s ad." },
+    fullScript: { type: Type.STRING, description: "A cohesive, timing-aware voiceover script. MUST be between 60 and 70 words to fit exactly 30 seconds." },
     scenes: {
       type: Type.ARRAY,
       items: {
@@ -98,8 +89,7 @@ export const generateAdPlan = async (
   settings: ProjectSettings,
   referenceFiles: ReferenceFile[]
 ): Promise<any> => {
-  if (!genAI) throw new Error("API Key not initialized");
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = "gemini-3-pro-preview";
   let context = "REFERENCE MATERIALS:\n";
   referenceFiles.forEach(file => {
@@ -120,15 +110,22 @@ export const generateAdPlan = async (
     ${settingsContext}
     USER REQUEST: "${prompt}"
     ${settings.customScript ? `USER SCRIPT: "${settings.customScript}"` : ""}
-    Generate a 30s ad plan. Scenes must be 4s or 6s.
+    
+    TASK: Generate a precise 30-second Video Ad Plan.
+    
+    CONSTRAINTS:
+    1. Total Duration must be exactly 30 seconds.
+    2. Scenes must be 4s or 6s. (e.g., 5 scenes of 6s, or mix).
+    3. The 'fullScript' is critical: It must be timed perfectly for a 30s read. Aim for exactly 60-75 words. No more, no less.
+    4. Ensure the script matches the visual flow of the scenes.
   `;
 
   try {
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
       model,
       contents: fullPrompt,
       config: {
-        systemInstruction: "You are a world-class AI Creative Director.",
+        systemInstruction: "You are a world-class AI Creative Director. You understand video editing timing perfectly.",
         responseMimeType: "application/json",
         responseSchema: adPlanSchema
       }
@@ -146,12 +143,11 @@ export const generateVideoClip = async (
   visualPrompt: string, 
   aspectRatio: AspectRatio, 
 ): Promise<string | null> => {
-    if (!genAI || !currentApiKey) throw new Error("API Key not initialized");
-
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
     
     try {
-        let operation = await genAI.models.generateVideos({
+        let operation = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
             prompt: visualPrompt,
             config: {
@@ -163,13 +159,13 @@ export const generateVideoClip = async (
 
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 5000));
-            operation = await genAI.operations.getVideosOperation({ operation: operation });
+            operation = await ai.operations.getVideosOperation({ operation: operation });
         }
 
         const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
         if (!videoUri) return null;
 
-        const response = await fetch(`${videoUri}&key=${currentApiKey}`);
+        const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
         if (!response.ok) throw new Error(`Video fetch failed: ${response.status}`);
         
         const blob = await response.blob();
@@ -184,14 +180,14 @@ export const generateVideoClip = async (
 // --- 3. TTS Generation (PCM to WAV) ---
 
 export const generateVoiceover = async (text: string, voice: TTSVoice): Promise<string | null> => {
-  if (!genAI) throw new Error("API Key not initialized");
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   if (!text) return null;
 
   console.log("Generating Voiceover for:", text);
 
   try {
     // Note: This model returns raw PCM, 24kHz, Mono (1 channel)
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
         model: "gemini-2.5-flash-preview-tts",
         contents: [{ parts: [{ text }] }],
         config: {
@@ -241,13 +237,29 @@ const getFallbackMusic = (mood: string) => {
 }
 
 export const generateMusic = async (moodDescription: string): Promise<string | null> => {
-    if (!currentApiKey) throw new Error("API Key not initialized");
     console.log("Generating Music with Lyria for mood:", moodDescription);
 
+    // Immediate Fallback trigger function
+    const triggerFallback = (reason: string) => {
+        console.warn(`Falling back to stock music. Reason: ${reason}`);
+        return getFallbackMusic(moodDescription);
+    };
+
     return new Promise(async (resolve) => {
+        let hasResolved = false;
+        
+        // Safety timeout - if Lyria hangs, resolve fallback
+        const safetyTimeout = setTimeout(() => {
+            if (!hasResolved) {
+                hasResolved = true;
+                resolve(triggerFallback("Lyria Timeout"));
+            }
+        }, 15000); // 15s timeout
+
         try {
             // CRITICAL FIX: Use v1alpha for Lyria as it is experimental
-            const lyriaClient = new GoogleGenAI({ apiKey: currentApiKey, apiVersion: 'v1alpha' });
+            // Wrapped in try/catch for connection errors
+            const lyriaClient = new GoogleGenAI({ apiKey: process.env.API_KEY, apiVersion: 'v1alpha' });
             
             // Lyria Spec: 48kHz, 2 Channels (Stereo)
             const SAMPLE_RATE = 48000;
@@ -267,7 +279,11 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
                     },
                     onerror: (err: any) => {
                         console.error("Lyria WebSocket Error:", err);
-                        // Do not reject here immediately, wait for timeout or allow fallback below
+                        if (!hasResolved) {
+                            hasResolved = true;
+                            clearTimeout(safetyTimeout);
+                            resolve(triggerFallback("WebSocket Error"));
+                        }
                     },
                     onclose: () => console.log("Lyria Session Closed"),
                 }
@@ -289,11 +305,14 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
             console.log("Starting Lyria stream...");
             await session.play();
 
-            // Record for 20 seconds (shorter for safety) then stop
+            // Record for 15 seconds then stop (shorter for faster demo)
             setTimeout(async () => {
+                if (hasResolved) return;
+
                 if (chunks.length === 0) {
-                    console.warn("Lyria produced no data. Falling back.");
-                    resolve(getFallbackMusic(moodDescription));
+                    hasResolved = true;
+                    clearTimeout(safetyTimeout);
+                    resolve(triggerFallback("No Data Received"));
                     return;
                 }
 
@@ -310,21 +329,26 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
                 const wavBlob = pcmToWavBlob(combinedPcm, SAMPLE_RATE, CHANNELS);
                 const url = URL.createObjectURL(wavBlob);
                 console.log("Lyria Music Generated:", url);
+                
+                hasResolved = true;
+                clearTimeout(safetyTimeout);
                 resolve(url);
-            }, 20000);
+            }, 15000);
 
         } catch (e) {
-            console.error("Lyria Generation Failed (Connection):", e);
-            console.log("Using Fallback Music");
-            resolve(getFallbackMusic(moodDescription));
+            if (!hasResolved) {
+                hasResolved = true;
+                clearTimeout(safetyTimeout);
+                resolve(triggerFallback(`Exception: ${e}`));
+            }
         }
     });
 };
 
 // --- 5. Chat Helper ---
 export const sendChatMessage = async (history: any[], message: string) => {
-    if (!genAI) throw new Error("API Key not initialized");
-    const chat = genAI.chats.create({
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const chat = ai.chats.create({
         model: 'gemini-3-pro-preview',
         history: history,
         config: { systemInstruction: "Helpful AI Assistant." }

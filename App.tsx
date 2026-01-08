@@ -178,19 +178,30 @@ const ProjectBoard: React.FC<{
     }
     setActiveSceneIndex(newIndex);
 
-    // Sync Video Elements visibility and playback
+    // Sync Video Elements (Opacity Stack Method)
     videoRefs.current.forEach((vid, idx) => {
         if (!vid) return;
+        
+        // Ensure all videos are attempting to play so they are ready
+        // 'loop' is true on the element, so they won't stop
+        if (isPlaying && vid.paused) {
+             vid.play().catch(() => {});
+        } else if (!isPlaying && !vid.paused) {
+             vid.pause();
+        }
+
+        // Switch visibility using Opacity and Z-Index
         if (idx === newIndex) {
-            vid.style.display = 'block';
-            if (isPlaying) {
-                // Ensure video plays
-                vid.play().catch(() => {});
-            }
+            vid.style.opacity = '1';
+            vid.style.zIndex = '10';
         } else {
-            vid.style.display = 'none';
-            vid.pause();
-            vid.currentTime = 0;
+            vid.style.opacity = '0';
+            vid.style.zIndex = '0';
+            
+            // Optional: Seek inactive videos to 0 if they are far behind/ahead, 
+            // but for gapless, keeping them playing (looping) in the background is smoothest 
+            // if we don't care about CPU. For a 5-video ad, this is acceptable.
+            // If optimization is needed, we would pause non-neighbors.
         }
     });
 
@@ -216,6 +227,11 @@ const ProjectBoard: React.FC<{
       if (currentTime === 0) {
           if (musicRef.current) musicRef.current.currentTime = 0;
           if (voRef.current) voRef.current.currentTime = 0;
+          
+          // Reset all videos to start
+          videoRefs.current.forEach(vid => {
+              if (vid) vid.currentTime = 0;
+          });
       }
   }, [currentTime]);
 
@@ -295,16 +311,21 @@ const ProjectBoard: React.FC<{
             <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${
                 settings.aspectRatio === '16:9' ? 'w-full aspect-video' : 'h-[50vh] md:h-[600px] aspect-[9/16]'
             }`}>
-                {/* Render ALL video elements, control visibility via state */}
+                {/* Render ALL video elements stacked. Control Z-Index and Opacity */}
                 {project.scenes.map((scene, idx) => (
                     <video
                         key={scene.id}
+                        preload="auto"
                         ref={el => videoRefs.current[idx] = el}
                         src={scene.videoUrl}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{ display: idx === 0 ? 'block' : 'none' }}
+                        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
+                        style={{ 
+                            opacity: idx === 0 ? 1 : 0,
+                            zIndex: idx === 0 ? 10 : 0
+                        }}
                         muted // Muted as we use separate audio tracks
                         playsInline
+                        loop // Loop individual clips so they don't freeze if timing is off by ms
                     />
                 ))}
 
@@ -475,7 +496,7 @@ export default function App() {
         if (window.aistudio) {
             const hasKey = await window.aistudio.hasSelectedApiKey();
             if (hasKey) {
-                GeminiService.initializeGemini(process.env.API_KEY || 'VALID_KEY_PLACEHOLDER');
+                // No init needed here as we use env directly
                 setApiKeyReady(true);
             }
         }
@@ -488,7 +509,6 @@ export default function App() {
         await window.aistudio.openSelectKey();
         const hasKey = await window.aistudio.hasSelectedApiKey();
         if (hasKey) {
-             GeminiService.initializeGemini(process.env.API_KEY || 'VALID_KEY_PLACEHOLDER');
              setApiKeyReady(true);
         }
     } else { alert("AI Studio environment not detected."); }
