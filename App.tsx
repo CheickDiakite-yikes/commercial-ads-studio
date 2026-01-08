@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice } from './types';
 import * as GeminiService from './services/geminiService';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2 } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu } from 'lucide-react';
 
 // --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
@@ -183,7 +183,10 @@ const ProjectBoard: React.FC<{
         if (!vid) return;
         if (idx === newIndex) {
             vid.style.display = 'block';
-            if (isPlaying) vid.play().catch(() => {});
+            if (isPlaying) {
+                // Ensure video plays
+                vid.play().catch(() => {});
+            }
         } else {
             vid.style.display = 'none';
             vid.pause();
@@ -196,13 +199,17 @@ const ProjectBoard: React.FC<{
   // 3. Audio Sync
   useEffect(() => {
     if (isPlaying) {
-        musicRef.current?.play().catch(e => console.log('Music play blocked', e));
-        voRef.current?.play().catch(e => console.log('VO play blocked', e));
+        if (musicRef.current && project?.musicUrl) {
+            musicRef.current.play().catch(e => console.log('Music play blocked', e));
+        }
+        if (voRef.current && project?.voiceoverUrl) {
+            voRef.current.play().catch(e => console.log('VO play blocked', e));
+        }
     } else {
         musicRef.current?.pause();
         voRef.current?.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, project]);
 
   // 4. Reset on stop
   useEffect(() => {
@@ -237,7 +244,7 @@ const ProjectBoard: React.FC<{
         <button onClick={() => setActiveTab('ingredients')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'ingredients' ? 'text-teal-600 border-b-2 border-teal-500 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Ingredients</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8 relative">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
         
         {/* Progress Overlay */}
         {project.isGenerating && (
@@ -265,7 +272,7 @@ const ProjectBoard: React.FC<{
                         {/* Phase 4: Scoring */}
                         <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'scoring' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
                              {(project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 4: Music Composition</span>
+                            <span className="font-bold">Phase 4: Music Composition (Lyria)</span>
                         </div>
                          {/* Phase 5: Mixing */}
                          <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'mixing' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
@@ -280,12 +287,13 @@ const ProjectBoard: React.FC<{
         {activeTab === 'output' ? (
           <div className="flex flex-col items-center h-full">
             {/* Audio Elements (Hidden but Active) */}
-            <audio ref={musicRef} src={project.musicUrl} volume={0.3} />
-            <audio ref={voRef} src={project.voiceoverUrl} volume={1.0} />
+            {/* Note: We force re-render when URLs change to ensure new Blobs are loaded */}
+            {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} volume={0.3} />}
+            {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} volume={1.0} />}
 
             {/* Video Sequencer Container */}
             <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${
-                settings.aspectRatio === '16:9' ? 'w-full aspect-video' : 'h-[600px] aspect-[9/16]'
+                settings.aspectRatio === '16:9' ? 'w-full aspect-video' : 'h-[50vh] md:h-[600px] aspect-[9/16]'
             }`}>
                 {/* Render ALL video elements, control visibility via state */}
                 {project.scenes.map((scene, idx) => (
@@ -302,30 +310,30 @@ const ProjectBoard: React.FC<{
 
                 {/* Overlays */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                    <h2 className="text-4xl md:text-6xl font-black text-white text-center drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] px-6">
+                    <h2 className="text-2xl md:text-6xl font-black text-white text-center drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] px-6">
                         {project.scenes[activeSceneIndex]?.textOverlay}
                     </h2>
                 </div>
 
                 {/* Controls */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between z-20">
+                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between z-20">
                     <div className="flex items-center gap-4">
                         <button 
                             onClick={() => setIsPlaying(!isPlaying)}
-                            className="p-3 bg-white rounded-full text-black hover:bg-pink-400 hover:text-white transition-colors shadow-lg"
+                            className="p-2 md:p-3 bg-white rounded-full text-black hover:bg-pink-400 hover:text-white transition-colors shadow-lg"
                         >
-                            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+                            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
                         </button>
                         <div className="flex flex-col">
-                            <span className="text-white font-bold text-sm tracking-wide">
+                            <span className="text-white font-bold text-xs md:text-sm tracking-wide">
                                 {formatTime(currentTime)} / {formatTime(totalDuration)}
                             </span>
-                            <span className="text-white/60 text-xs font-mono">
+                            <span className="text-white/60 text-[10px] md:text-xs font-mono">
                                 PHASE: FINAL MIX
                             </span>
                         </div>
                     </div>
-                     <div className="flex items-center gap-2 text-white/50 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+                     <div className="hidden md:flex items-center gap-2 text-white/50 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
                         <Music size={12} />
                         <span className="text-xs font-bold uppercase">{project.musicMood}</span>
                     </div>
@@ -333,13 +341,13 @@ const ProjectBoard: React.FC<{
             </div>
 
             <div className="mt-8 w-full max-w-2xl">
-                <h1 className="text-3xl font-display font-bold text-slate-800 mb-2">{project.title}</h1>
-                <p className="text-slate-600 mb-6">{project.concept}</p>
-                <div className="flex gap-4">
-                    <button className="btn-primary px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800">
+                <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">{project.title}</h1>
+                <p className="text-sm md:text-base text-slate-600 mb-6">{project.concept}</p>
+                <div className="flex flex-col md:flex-row gap-4">
+                    <button className="btn-primary px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800">
                         <Download size={18} /> Export Mixed MP4
                     </button>
-                    <button className="btn-primary px-6 py-3 bg-white text-slate-900 border-2 border-slate-900 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50">
+                    <button className="btn-primary px-6 py-3 bg-white text-slate-900 border-2 border-slate-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50">
                         Copy FFmpeg Command
                     </button>
                 </div>
@@ -361,14 +369,22 @@ const ProjectBoard: React.FC<{
                         <Mic size={18} /> Master Voiceover
                     </div>
                     <p className="text-xs text-slate-600 italic line-clamp-3">"{project.fullScript}"</p>
-                    {project.voiceoverUrl && <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" />}
+                    {project.voiceoverUrl ? (
+                        <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" />
+                    ) : (
+                        <div className="text-xs text-red-400 italic">No audio generated.</div>
+                    )}
                 </div>
                 <div className="bg-teal-50 border border-teal-100 p-4 rounded-xl flex flex-col gap-2">
                      <div className="flex items-center gap-2 text-teal-700 font-bold">
                         <Music size={18} /> Master Score
                     </div>
                     <p className="text-xs text-slate-600 capitalize">{project.musicMood} Theme</p>
-                    {project.musicUrl && <audio controls src={project.musicUrl} className="w-full h-8 mt-2" />}
+                     {project.musicUrl ? (
+                        <audio controls src={project.musicUrl} className="w-full h-8 mt-2" />
+                    ) : (
+                        <div className="text-xs text-red-400 italic">No audio generated.</div>
+                    )}
                 </div>
             </div>
 
@@ -420,7 +436,7 @@ const AgentChat: React.FC<{
   };
 
   return (
-    <div className={`absolute bottom-8 right-8 z-50 transition-all duration-300 ${isOpen ? 'w-96 h-[500px]' : 'w-16 h-16'}`}>
+    <div className={`absolute bottom-4 right-4 md:bottom-8 md:right-8 z-50 transition-all duration-300 ${isOpen ? 'w-[calc(100vw-2rem)] md:w-96 h-[500px]' : 'w-16 h-16'}`}>
       {!isOpen && <button onClick={() => setIsOpen(true)} className="w-16 h-16 rounded-full bg-slate-900 text-white shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"><MessageSquare size={24} /></button>}
       {isOpen && (
         <div className="w-full h-full flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden ring-4 ring-slate-900/5">
@@ -451,6 +467,8 @@ export default function App() {
   const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine });
   const [project, setProject] = useState<AdProject | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showLeftPanel, setShowLeftPanel] = useState(false);
+  const [showRightPanel, setShowRightPanel] = useState(false);
 
   useEffect(() => {
     const initKey = async () => {
@@ -508,7 +526,7 @@ export default function App() {
         // Phase 4: Scoring (Single Track)
         setProject(prev => prev ? ({...prev, currentPhase: 'scoring'}) : null);
         const musicUrl = await GeminiService.generateMusic(plan.musicMood);
-        setProject(prev => prev ? ({...prev, musicUrl}) : null);
+        setProject(prev => prev ? ({...prev, musicUrl: musicUrl || undefined}) : null);
 
         // Phase 5: Final Mix
         setProject(prev => prev ? ({...prev, currentPhase: 'mixing'}) : null);
@@ -526,25 +544,83 @@ export default function App() {
 
   if (!apiKeyReady) {
     return (
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white space-y-6">
-            <h1 className="text-5xl font-display font-bold">AdStudio<span className="text-pink-500">.ai</span></h1>
-            <p className="text-slate-400">Please select a Paid API Key.</p>
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white space-y-6 text-center px-4">
+            <h1 className="text-4xl md:text-5xl font-display font-bold">AdStudio<span className="text-pink-500">.ai</span></h1>
+            <p className="text-slate-400 max-w-md">Create world-class video ads with a fully autonomous creative director.</p>
             <button onClick={handleApiKeySelection} className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:bg-pink-500 hover:text-white transition-all shadow-xl">Connect Google AI Studio Key</button>
         </div>
     )
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden">
-        <header className="h-16 flex items-center justify-between px-6 bg-white/40 backdrop-blur-md border-b border-white/50 z-10">
-            <div className="flex items-center gap-2"><div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg" /><span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span></div>
-            <div className="flex items-center gap-4"><span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span><div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md"><img src="https://picsum.photos/100" alt="User" /></div></div>
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50">
+        <header className="h-16 flex items-center justify-between px-4 md:px-6 bg-white/40 backdrop-blur-md border-b border-white/50 z-20 relative">
+            <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
+                <Menu />
+            </button>
+            
+            <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg" />
+                <span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span>
+            </div>
+
+            <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
+                <Settings />
+            </button>
+
+            <div className="hidden lg:flex items-center gap-4">
+                <span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span>
+                <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md">
+                    <img src="https://picsum.photos/100" alt="User" />
+                </div>
+            </div>
         </header>
-        <div className="flex-1 grid grid-cols-4 overflow-hidden relative">
-            <div className="col-span-1 border-r border-white/40 bg-white/20 backdrop-blur-md shadow-lg z-10 relative"><ReferenceManager files={referenceFiles} setFiles={setReferenceFiles} /></div>
-            <div className="col-span-2 relative bg-white/5"><ProjectBoard project={project} setProject={setProject} settings={settings} /></div>
-            <div className="col-span-1 border-l border-white/40 bg-white/20 backdrop-blur-md shadow-lg z-10 relative"><SettingsPanel settings={settings} setSettings={setSettings} /></div>
+
+        <div className="flex-1 relative overflow-hidden">
+            <div className="w-full h-full grid grid-cols-1 lg:grid-cols-4">
+                
+                {/* Left Panel (Reference Manager) */}
+                <div className={`
+                    fixed inset-y-0 left-0 w-80 lg:w-full lg:static lg:col-span-1 
+                    bg-white/80 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
+                    border-r border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
+                    ${showLeftPanel ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                `}>
+                    <div className="h-full relative pt-16 lg:pt-0">
+                        <button onClick={() => setShowLeftPanel(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
+                        <ReferenceManager files={referenceFiles} setFiles={setReferenceFiles} />
+                    </div>
+                </div>
+
+                {/* Center Panel (Project Board) */}
+                <div className="col-span-1 lg:col-span-2 relative bg-white/5 w-full h-full overflow-hidden">
+                    <ProjectBoard project={project} setProject={setProject} settings={settings} />
+                </div>
+
+                {/* Right Panel (Settings) */}
+                <div className={`
+                    fixed inset-y-0 right-0 w-80 lg:w-full lg:static lg:col-span-1 
+                    bg-white/80 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
+                    border-l border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
+                    ${showRightPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+                `}>
+                    <div className="h-full relative pt-16 lg:pt-0">
+                         <button onClick={() => setShowRightPanel(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
+                        <SettingsPanel settings={settings} setSettings={setSettings} />
+                    </div>
+                </div>
+
+            </div>
+
+             {/* Mobile Overlay for panels */}
+            {(showLeftPanel || showRightPanel) && (
+                <div 
+                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 lg:hidden"
+                    onClick={() => { setShowLeftPanel(false); setShowRightPanel(false); }}
+                />
+            )}
         </div>
+        
         <AgentChat onGenerate={handleGenerateProject} isProcessing={isProcessing} />
     </div>
   );
