@@ -12,22 +12,17 @@ export enum TTSVoice {
   Aoede = 'Aoede'
 }
 
-export enum VideoResolution {
-  HD = '720p',
-  FHD = '1080p'
-}
-
 export interface ReferenceFile {
   id: string;
   name: string;
   type: 'image' | 'pdf' | 'text';
-  content: string; // Base64 or text content
+  content: string;
   previewUrl?: string;
 }
 
 export interface ProjectSettings {
   customScript: string;
-  musicTheme: string; // Or specific upload
+  musicTheme: string;
   useTextOverlays: 'yes' | 'no' | 'auto';
   textOverlayFont?: string;
   preferredVoice: TTSVoice | 'auto';
@@ -37,24 +32,28 @@ export interface ProjectSettings {
 export interface Scene {
   id: string;
   order: number;
-  duration: 4 | 6; // Veo 3 constraints for this app
-  visualPrompt: string; // For Veo
-  scriptLine: string; // For TTS
-  textOverlay: string; 
-  status: 'pending' | 'generating_video' | 'generating_audio' | 'complete' | 'failed';
-  videoUrl?: string; // Result from Veo
-  audioUrl?: string; // Result from TTS
-  thumbnail?: string;
+  duration: 4 | 6; // Veo 3 constraints
+  visualPrompt: string;
+  textOverlay: string; // Text is still per-scene
+  status: 'pending' | 'generating' | 'complete' | 'failed';
+  videoUrl?: string; // The video blob
 }
 
 export interface AdProject {
   title: string;
   concept: string;
   musicMood: string;
-  musicUrl?: string; // Added music URL
-  ffmpegCommand?: string; // Generated FFmpeg command
+  fullScript: string; // The cohesive script for the whole ad
+  
+  // Assets
   scenes: Scene[];
+  voiceoverUrl?: string; // Single audio file for the whole ad
+  musicUrl?: string;     // Single audio file for the whole ad
+  
+  // State
+  ffmpegCommand?: string;
   isGenerating: boolean;
+  currentPhase: 'planning' | 'video_production' | 'voiceover' | 'scoring' | 'mixing' | 'ready';
 }
 
 export interface ChatMessage {

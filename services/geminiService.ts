@@ -1,24 +1,24 @@
 import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
-import { AspectRatio, ProjectSettings, ReferenceFile, Scene, TTSVoice } from "../types";
+import { AspectRatio, ProjectSettings, ReferenceFile, TTSVoice } from "../types";
 
-// This will be initialized with the key from the user selection
 let genAI: GoogleGenAI | null = null;
 let currentApiKey: string | null = null;
 
 export const initializeGemini = (apiKey: string) => {
   genAI = new GoogleGenAI({ apiKey });
   currentApiKey = apiKey;
-  console.log("Gemini initialized with API Key.");
+  console.log("Gemini initialized.");
 };
 
-// --- 1. The Creative Director Agent ---
+// --- 1. The Creative Director Agent (Updated for Full Script) ---
 
 const adPlanSchema: Schema = {
   type: Type.OBJECT,
   properties: {
-    title: { type: Type.STRING, description: "Title of the ad campaign" },
-    concept: { type: Type.STRING, description: "Brief explanation of the creative direction and story" },
-    musicMood: { type: Type.STRING, description: "Description of music style/genre/mood" },
+    title: { type: Type.STRING },
+    concept: { type: Type.STRING },
+    musicMood: { type: Type.STRING },
+    fullScript: { type: Type.STRING, description: "A cohesive, timing-aware voiceover script for the entire 30s ad. Do not include scene numbers, just the spoken text." },
     scenes: {
       type: Type.ARRAY,
       items: {
@@ -26,17 +26,16 @@ const adPlanSchema: Schema = {
         properties: {
           id: { type: Type.STRING },
           order: { type: Type.INTEGER },
-          duration: { type: Type.INTEGER, description: "Must be either 4 or 6 seconds" },
-          visualPrompt: { type: Type.STRING, description: "Highly detailed, cinematic visual description for AI video generation. Focus on lighting, camera movement, subject action, and texture." },
-          scriptLine: { type: Type.STRING, description: "Spoken voiceover line for this scene" },
-          textOverlay: { type: Type.STRING, description: "Short, punchy text to appear on screen" }
+          duration: { type: Type.INTEGER, description: "4 or 6" },
+          visualPrompt: { type: Type.STRING, description: "Detailed visual description for Veo." },
+          textOverlay: { type: Type.STRING, description: "Optional short text overlay." }
         },
-        required: ["id", "order", "duration", "visualPrompt", "scriptLine", "textOverlay"]
+        required: ["id", "order", "duration", "visualPrompt"]
       }
     },
-    ffmpegCommand: { type: Type.STRING, description: "A robust ffmpeg command to stitch these files" }
+    ffmpegCommand: { type: Type.STRING, description: "FFmpeg command to concat videos and mix audio." }
   },
-  required: ["title", "concept", "scenes", "musicMood", "ffmpegCommand"]
+  required: ["title", "concept", "scenes", "musicMood", "fullScript", "ffmpegCommand"]
 };
 
 export const generateAdPlan = async (
@@ -47,9 +46,7 @@ export const generateAdPlan = async (
   if (!genAI) throw new Error("API Key not initialized");
 
   const model = "gemini-3-pro-preview";
-  console.log("Generating Ad Plan with Model:", model);
   
-  // Construct Context from RAG (Reference Files)
   let context = "REFERENCE MATERIALS:\n";
   referenceFiles.forEach(file => {
     context += `- File: ${file.name} (${file.type}): ${file.content.substring(0, 500)}...\n`;
@@ -60,34 +57,30 @@ export const generateAdPlan = async (
     - Aspect Ratio: ${settings.aspectRatio}
     - Voice Preference: ${settings.preferredVoice}
     - Text Overlays: ${settings.useTextOverlays}
-    - Custom Script provided: ${settings.customScript ? "Yes (prioritize this)" : "No"}
-    - Custom Music Theme: ${settings.musicTheme}
+    - Custom Script provided: ${settings.customScript ? "Yes (Use this strictly)" : "No"}
+    - Music Theme: ${settings.musicTheme}
   `;
 
   const systemInstruction = `
-    You are a world-class AI Creative Director and Producer for a Hollywood-style ad agency. 
-    Your goal is to create a cohesive, emotionally resonant, and visually stunning video ad plan.
+    You are a world-class AI Creative Director. Create a stunning video ad plan.
+    
+    Workflow:
+    1. Plan a sequence of shots (Scenes) that total EXACTLY 28-30 seconds.
+    2. Write a single, cohesive voiceover script ('fullScript') that flows naturally across these scenes.
+    3. Define the visual prompts for Veo (video generation).
     
     Constraints:
-    1. Total ad length: Max 30 seconds.
-    2. Scene duration: MUST be either 4 or 6 seconds exactly. Never 8.
-    3. Output strictly structured JSON.
-    4. Harness FFmpeg knowledge for the 'ffmpegCommand' field.
-    5. If the user provided reference files, strictly adhere to their branding/tone.
-    6. If 'useTextOverlays' is 'no', leave textOverlay fields empty.
-    
-    IMPORTANT: For 'visualPrompt', be extremely descriptive. Use terms like "cinematic lighting", "4k", "slow motion", "depth of field", "photorealistic". 
-    Avoid generic descriptions. The video generation model needs high fidelity details.
+    - Scenes must be 4s or 6s.
+    - Total duration ~30s.
+    - 'visualPrompt' must be cinematic and detailed (lighting, movement, lens).
   `;
 
   const fullPrompt = `
     ${context}
     ${settingsContext}
-    
     USER REQUEST: "${prompt}"
     ${settings.customScript ? `USER SCRIPT: "${settings.customScript}"` : ""}
-    
-    Generate the ad production plan now.
+    Generate the ad production plan.
   `;
 
   try {
@@ -97,12 +90,9 @@ export const generateAdPlan = async (
       config: {
         systemInstruction,
         responseMimeType: "application/json",
-        responseSchema: adPlanSchema,
-        thinkingConfig: { thinkingBudget: 4096 } 
+        responseSchema: adPlanSchema
       }
     });
-
-    console.log("Ad Plan Generated:", response.text);
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Ad Plan Generation Failed:", error);
@@ -110,18 +100,16 @@ export const generateAdPlan = async (
   }
 };
 
-
 // --- 2. Veo 3.1 Video Generation ---
 
 export const generateVideoClip = async (
   visualPrompt: string, 
   aspectRatio: AspectRatio, 
-  duration: 4 | 6
 ): Promise<string | null> => {
     if (!genAI || !currentApiKey) throw new Error("API Key not initialized");
 
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
-    console.log(`Starting Veo Generation. Prompt: "${visualPrompt.substring(0, 30)}...", Aspect: ${aspect}`);
+    // Force 720p for speed/stability in demo
     
     try {
         let operation = await genAI.models.generateVideos({
@@ -134,49 +122,33 @@ export const generateVideoClip = async (
             }
         });
 
-        console.log("Veo Operation Started:", operation);
-
+        // Polling
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 5000));
             operation = await genAI.operations.getVideosOperation({ operation: operation });
-            console.log("Veo Polling...", operation.metadata);
         }
 
         const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!videoUri) {
-            console.error("Veo completed but no URI found.");
-            return null;
-        }
+        if (!videoUri) return null;
 
-        console.log("Veo URI obtained. Fetching content...");
-        
-        // Critical Fix: Fetch the video bytes using the key and create a Blob URL.
-        // Direct URIs often fail in <video> tags due to auth/CORS.
+        // Fetch Blob
         const response = await fetch(`${videoUri}&key=${currentApiKey}`);
-        if (!response.ok) {
-            throw new Error(`Failed to download video: ${response.status} ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Video fetch failed: ${response.status}`);
         
         const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        console.log("Video Blob URL created:", blobUrl);
-        
-        return blobUrl;
+        return URL.createObjectURL(blob);
 
     } catch (error) {
-        console.error("Veo Generation Error:", error);
+        console.error("Veo Error:", error);
         return null;
     }
 };
 
-
-// --- 3. TTS Generation ---
+// --- 3. TTS Generation (Single File) ---
 
 export const generateVoiceover = async (text: string, voice: TTSVoice): Promise<string | null> => {
   if (!genAI) throw new Error("API Key not initialized");
   if (!text) return null;
-
-  console.log(`Generating TTS for: "${text.substring(0, 20)}..." using ${voice}`);
 
   try {
     const response = await genAI.models.generateContent({
@@ -203,10 +175,7 @@ export const generateVoiceover = async (text: string, voice: TTSVoice): Promise<
   }
 };
 
-// --- 4. Music Generation (Simulated/Placeholder) ---
-// Note: Google's GenAI SDK does not currently expose a public 'Music Generation' model (like Lyria) 
-// in the standard library. To satisfy the prompt's requirement for a working app, 
-// we will simulate this by selecting high-quality royalty-free tracks based on the mood.
+// --- 4. Music (Simulated) ---
 
 const MOOD_TRACKS: Record<string, string> = {
     'upbeat': 'https://cdn.pixabay.com/download/audio/2024/05/20/audio_34b92569de.mp3?filename=uplifting-background-music-for-videos-corporates-presentations-205562.mp3',
@@ -217,19 +186,17 @@ const MOOD_TRACKS: Record<string, string> = {
 };
 
 export const generateMusic = async (moodDescription: string): Promise<string> => {
-    console.log("Selecting Music for mood:", moodDescription);
-    // Simulate API latency
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Simulate delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     const lowerMood = moodDescription.toLowerCase();
-    let selectedTrack = MOOD_TRACKS['cinematic']; // Default
+    let selectedTrack = MOOD_TRACKS['cinematic'];
 
-    if (lowerMood.includes('happy') || lowerMood.includes('upbeat') || lowerMood.includes('fun')) selectedTrack = MOOD_TRACKS['upbeat'];
-    else if (lowerMood.includes('business') || lowerMood.includes('corporate') || lowerMood.includes('tech')) selectedTrack = MOOD_TRACKS['corporate'];
-    else if (lowerMood.includes('sad') || lowerMood.includes('emotional') || lowerMood.includes('touching')) selectedTrack = MOOD_TRACKS['emotional'];
-    else if (lowerMood.includes('jazz') || lowerMood.includes('lounge')) selectedTrack = MOOD_TRACKS['jazz'];
+    if (lowerMood.includes('happy') || lowerMood.includes('upbeat')) selectedTrack = MOOD_TRACKS['upbeat'];
+    else if (lowerMood.includes('business') || lowerMood.includes('tech')) selectedTrack = MOOD_TRACKS['corporate'];
+    else if (lowerMood.includes('sad') || lowerMood.includes('emotional')) selectedTrack = MOOD_TRACKS['emotional'];
+    else if (lowerMood.includes('jazz')) selectedTrack = MOOD_TRACKS['jazz'];
 
-    console.log("Music Track Selected:", selectedTrack);
     return selectedTrack;
 };
 
@@ -239,9 +206,7 @@ export const sendChatMessage = async (history: any[], message: string) => {
     const chat = genAI.chats.create({
         model: 'gemini-3-pro-preview',
         history: history,
-        config: {
-            systemInstruction: "You are a helpful AI assistant for AdStudio. If the user asks to generate an ad, simply acknowledge and say you are starting the process."
-        }
+        config: { systemInstruction: "Helpful AI Assistant." }
     });
     
     const result = await chat.sendMessage({ message });

@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, Scene, TTSVoice } from './types';
+import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice } from './types';
 import * as GeminiService from './services/geminiService';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Image as ImageIcon, Volume2, VolumeX, Pause } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2 } from 'lucide-react';
 
-// --- Components defined internally for single-file adherence, normally separated ---
-
-// 1. Reference Manager (Left Panel)
+// --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
   files: ReferenceFile[];
   setFiles: React.Dispatch<React.SetStateAction<ReferenceFile[]>>;
@@ -26,7 +24,6 @@ const ReferenceManager: React.FC<{
         };
         setFiles(prev => [...prev, newFile]);
       };
-      // For demo, reading as DataURL. Real RAG would need text extraction for PDFs.
       reader.readAsDataURL(file);
     }
   };
@@ -41,19 +38,11 @@ const ReferenceManager: React.FC<{
         >
           <Plus size={20} />
         </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept="image/*,application/pdf,text/plain"
-        />
+        <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf,text/plain" />
       </div>
-
       <div className="flex-1 overflow-y-auto space-y-4 pr-2">
         {files.length === 0 && (
-            <div className="text-slate-400 text-sm text-center mt-10 italic">
-                No reference files. Upload brand assets, logos, or decks here.
-            </div>
+            <div className="text-slate-400 text-sm text-center mt-10 italic">No assets uploaded.</div>
         )}
         {files.map(file => (
           <div key={file.id} className="memphis-card p-3 rounded-xl relative group">
@@ -65,11 +54,7 @@ const ReferenceManager: React.FC<{
             </button>
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
-                {file.type === 'image' && file.previewUrl ? (
-                  <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" />
-                ) : (
-                  <FileText className="text-slate-400" />
-                )}
+                {file.type === 'image' && file.previewUrl ? <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" /> : <FileText className="text-slate-400" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
@@ -83,7 +68,7 @@ const ReferenceManager: React.FC<{
   );
 };
 
-// 2. Settings Panel (Right Panel)
+// --- Settings Panel (Right Panel) ---
 const SettingsPanel: React.FC<{
   settings: ProjectSettings;
   setSettings: React.Dispatch<React.SetStateAction<ProjectSettings>>;
@@ -91,8 +76,6 @@ const SettingsPanel: React.FC<{
   return (
     <div className="h-full flex flex-col p-6 space-y-8 overflow-y-auto">
       <h2 className="text-2xl font-display font-bold text-slate-800">Studio Settings</h2>
-      
-      {/* Aspect Ratio */}
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aspect Ratio</label>
         <div className="grid grid-cols-2 gap-3">
@@ -100,142 +83,134 @@ const SettingsPanel: React.FC<{
             <button
               key={ratio}
               onClick={() => setSettings(prev => ({ ...prev, aspectRatio: ratio }))}
-              className={`p-3 rounded-xl border-2 font-bold text-sm transition-all ${
-                settings.aspectRatio === ratio 
-                  ? 'border-pink-500 bg-pink-50 text-pink-600 shadow-[2px_2px_0px_0px_rgba(236,72,153,1)]' 
-                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
-              }`}
+              className={`p-3 rounded-xl border-2 font-bold text-sm transition-all ${settings.aspectRatio === ratio ? 'border-pink-500 bg-pink-50 text-pink-600 shadow-[2px_2px_0px_0px_rgba(236,72,153,1)]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
             >
               {ratio}
             </button>
           ))}
         </div>
       </div>
-
-      {/* Voice */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <Mic size={14} /> Voice
-        </label>
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Mic size={14} /> Voice</label>
         <select 
-          className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 focus:border-pink-500 outline-none transition-colors"
+          className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 focus:border-pink-500 outline-none"
           value={settings.preferredVoice}
           onChange={(e) => setSettings(prev => ({ ...prev, preferredVoice: e.target.value as TTSVoice | 'auto' }))}
         >
           <option value="auto">Let AI Decide</option>
-          {Object.values(TTSVoice).map(voice => (
-            <option key={voice} value={voice}>{voice}</option>
-          ))}
+          {Object.values(TTSVoice).map(voice => <option key={voice} value={voice}>{voice}</option>)}
         </select>
       </div>
-
-      {/* Text Overlays */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <Layers size={14} /> Text Overlays
-        </label>
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Layers size={14} /> Text Overlays</label>
         <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
             {['yes', 'auto', 'no'].map((opt) => (
-                 <button
-                 key={opt}
-                 onClick={() => setSettings(prev => ({ ...prev, useTextOverlays: opt as any }))}
-                 className={`flex-1 py-2 text-xs font-bold rounded-md capitalize transition-all ${
-                    settings.useTextOverlays === opt ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'
-                 }`}
-               >
-                 {opt}
-               </button>
+                 <button key={opt} onClick={() => setSettings(prev => ({ ...prev, useTextOverlays: opt as any }))} className={`flex-1 py-2 text-xs font-bold rounded-md capitalize ${settings.useTextOverlays === opt ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>{opt}</button>
             ))}
         </div>
         {settings.useTextOverlays !== 'no' && (
-            <input 
-                type="text" 
-                placeholder="Preferred Font (Optional)"
-                className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm"
-                value={settings.textOverlayFont || ''}
-                onChange={(e) => setSettings(prev => ({...prev, textOverlayFont: e.target.value}))}
-            />
+            <input type="text" placeholder="Preferred Font (Optional)" className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm" value={settings.textOverlayFont || ''} onChange={(e) => setSettings(prev => ({...prev, textOverlayFont: e.target.value}))} />
         )}
       </div>
-
-      {/* Music */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <Music size={14} /> Music Theme
-        </label>
-        <input 
-            type="text"
-            placeholder="e.g., Upbeat, Corporate, Jazz..."
-            className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm"
-            value={settings.musicTheme}
-            onChange={(e) => setSettings(prev => ({...prev, musicTheme: e.target.value}))}
-        />
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Music size={14} /> Music Theme</label>
+        <input type="text" placeholder="e.g., Upbeat..." className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm" value={settings.musicTheme} onChange={(e) => setSettings(prev => ({...prev, musicTheme: e.target.value}))} />
       </div>
-
-      {/* Script */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <FileText size={14} /> Custom Script
-        </label>
-        <textarea 
-            placeholder="Enter specific lines needed..."
-            className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm h-32 resize-none"
-            value={settings.customScript}
-            onChange={(e) => setSettings(prev => ({...prev, customScript: e.target.value}))}
-        />
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><FileText size={14} /> Custom Script</label>
+        <textarea placeholder="Enter lines..." className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm h-32 resize-none" value={settings.customScript} onChange={(e) => setSettings(prev => ({...prev, customScript: e.target.value}))} />
       </div>
     </div>
   );
 };
 
-// 3. Middle Panel (Project Board)
+// --- Middle Panel: Advanced Sequencer Player ---
 const ProjectBoard: React.FC<{
   project: AdProject | null;
   setProject: React.Dispatch<React.SetStateAction<AdProject | null>>;
-}> = ({ project, setProject }) => {
+  settings: ProjectSettings;
+}> = ({ project, setProject, settings }) => {
   const [activeTab, setActiveTab] = useState<'output' | 'ingredients'>('output');
-  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Master Sequencer State
+  const [currentTime, setCurrentTime] = useState(0);
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  
+  const musicRef = useRef<HTMLAudioElement>(null);
+  const voRef = useRef<HTMLAudioElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
 
-  // Sync music with play state
-  useEffect(() => {
-    if (activeTab === 'output' && project?.musicUrl && audioRef.current) {
-        if (isPlaying) {
-            audioRef.current.play().catch(e => console.warn("Audio play interrupted", e));
-        } else {
-            audioRef.current.pause();
-        }
-    }
-  }, [isPlaying, activeTab, project]);
+  // Calculate Total Duration
+  const totalDuration = project ? project.scenes.reduce((acc, scene) => acc + scene.duration, 0) : 0;
 
-  // Handle Scene Transitions
+  // 1. Playback Loop
   useEffect(() => {
-    let interval: any;
-    if (isPlaying && project && activeTab === 'output') {
-        const sceneDuration = project.scenes[currentSceneIndex]?.duration || 4;
-        
-        interval = setTimeout(() => {
-            setCurrentSceneIndex(prev => {
-                if (prev >= project.scenes.length - 1) {
+    let interval: number;
+    if (isPlaying && totalDuration > 0) {
+        interval = window.setInterval(() => {
+            setCurrentTime(prev => {
+                const next = prev + 0.1; // 100ms ticks
+                if (next >= totalDuration) {
                     setIsPlaying(false);
-                    return 0; // Reset
+                    return 0;
                 }
-                return prev + 1;
+                return next;
             });
-        }, sceneDuration * 1000);
+        }, 100);
     }
-    return () => clearTimeout(interval);
-  }, [isPlaying, project, activeTab, currentSceneIndex]);
+    return () => clearInterval(interval);
+  }, [isPlaying, totalDuration]);
 
-  // Reset audio when resetting to start
+  // 2. Sync Active Scene & Video Elements
   useEffect(() => {
-      if (currentSceneIndex === 0 && audioRef.current && isPlaying) {
-          audioRef.current.currentTime = 0;
-      }
-  }, [currentSceneIndex, isPlaying]);
+    if (!project) return;
+    
+    // Determine which scene is active based on currentTime
+    let accumulatedTime = 0;
+    let newIndex = 0;
+    for (let i = 0; i < project.scenes.length; i++) {
+        if (currentTime >= accumulatedTime && currentTime < accumulatedTime + project.scenes[i].duration) {
+            newIndex = i;
+            break;
+        }
+        accumulatedTime += project.scenes[i].duration;
+    }
+    setActiveSceneIndex(newIndex);
 
+    // Sync Video Elements visibility and playback
+    videoRefs.current.forEach((vid, idx) => {
+        if (!vid) return;
+        if (idx === newIndex) {
+            vid.style.display = 'block';
+            if (isPlaying) vid.play().catch(() => {});
+        } else {
+            vid.style.display = 'none';
+            vid.pause();
+            vid.currentTime = 0;
+        }
+    });
+
+  }, [currentTime, project, isPlaying]);
+
+  // 3. Audio Sync
+  useEffect(() => {
+    if (isPlaying) {
+        musicRef.current?.play().catch(e => console.log('Music play blocked', e));
+        voRef.current?.play().catch(e => console.log('VO play blocked', e));
+    } else {
+        musicRef.current?.pause();
+        voRef.current?.pause();
+    }
+  }, [isPlaying]);
+
+  // 4. Reset on stop
+  useEffect(() => {
+      if (currentTime === 0) {
+          if (musicRef.current) musicRef.current.currentTime = 0;
+          if (voRef.current) voRef.current.currentTime = 0;
+      }
+  }, [currentTime]);
 
   if (!project) {
     return (
@@ -248,79 +223,91 @@ const ProjectBoard: React.FC<{
     );
   }
 
+  const formatTime = (time: number) => {
+      const m = Math.floor(time / 60);
+      const s = Math.floor(time % 60);
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Tabs */}
       <div className="flex border-b border-white/40 bg-white/10 backdrop-blur-sm">
-        <button
-          onClick={() => setActiveTab('output')}
-          className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
-            activeTab === 'output' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/50' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Final Output
-        </button>
-        <button
-          onClick={() => setActiveTab('ingredients')}
-          className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${
-            activeTab === 'ingredients' ? 'text-teal-600 border-b-2 border-teal-500 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Ingredients
-        </button>
+        <button onClick={() => setActiveTab('output')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'output' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Final Output</button>
+        <button onClick={() => setActiveTab('ingredients')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'ingredients' ? 'text-teal-600 border-b-2 border-teal-500 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Ingredients</button>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-8 relative">
+        
+        {/* Progress Overlay */}
         {project.isGenerating && (
-            <div className="absolute inset-0 z-50 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center">
-                <Loader2 className="animate-spin text-pink-500 mb-4" size={48} />
-                <p className="font-display font-bold text-slate-800">Generating Assets...</p>
-                <p className="text-sm text-slate-500 mt-2">Gemini is creating Veo 3.1 Videos, TTS Audio & Music</p>
-                <p className="text-xs text-slate-400 mt-1">This may take up to 30-60 seconds.</p>
+            <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
+                <div className="max-w-md w-full space-y-6">
+                    <Loader2 className="animate-spin text-pink-500 mx-auto" size={48} />
+                    <h3 className="text-2xl font-display font-bold text-slate-900">Production In Progress</h3>
+                    
+                    <div className="space-y-4">
+                        {/* Phase 1: Planning */}
+                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'planning' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                            {project.currentPhase !== 'planning' && project.scenes.length > 0 ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                            <span className="font-bold">Phase 1: Creative Brief & Storyboard</span>
+                        </div>
+                        {/* Phase 2: Video */}
+                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'video_production' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                             {(project.currentPhase === 'voiceover' || project.currentPhase === 'scoring' || project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                            <span className="font-bold">Phase 2: Video Generation (Veo)</span>
+                        </div>
+                        {/* Phase 3: VO */}
+                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'voiceover' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                             {(project.currentPhase === 'scoring' || project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                            <span className="font-bold">Phase 3: Voiceover Recording (TTS)</span>
+                        </div>
+                        {/* Phase 4: Scoring */}
+                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'scoring' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                             {(project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                            <span className="font-bold">Phase 4: Music Composition</span>
+                        </div>
+                         {/* Phase 5: Mixing */}
+                         <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'mixing' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                             {project.currentPhase === 'ready' ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                            <span className="font-bold">Phase 5: Final Mix & Stitch</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         )}
 
         {activeTab === 'output' ? (
           <div className="flex flex-col items-center h-full">
-            {/* Background Music Audio Element (Hidden) */}
-            {project.musicUrl && (
-                <audio ref={audioRef} src={project.musicUrl} loop volume={0.4} />
-            )}
+            {/* Audio Elements (Hidden but Active) */}
+            <audio ref={musicRef} src={project.musicUrl} volume={0.3} />
+            <audio ref={voRef} src={project.voiceoverUrl} volume={1.0} />
 
-            {/* Player Container */}
+            {/* Video Sequencer Container */}
             <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${
-                // Simulate aspect ratio roughly
-                project.scenes[0].videoUrl && project.scenes[0].videoUrl.includes('16:9') ? 'w-full aspect-video' : 'h-[600px] aspect-[9/16]'
+                settings.aspectRatio === '16:9' ? 'w-full aspect-video' : 'h-[600px] aspect-[9/16]'
             }`}>
-                {/* Scene Video */}
-                {project.scenes[currentSceneIndex]?.videoUrl ? (
-                     <video 
-                        ref={videoRef}
-                        key={project.scenes[currentSceneIndex].videoUrl} // Force re-render on src change
-                        src={project.scenes[currentSceneIndex].videoUrl} 
-                        className="w-full h-full object-cover animate-fade-in"
-                        autoPlay={isPlaying}
-                        loop // Loop individual clips for effect if duration mismatches slightly
-                        muted // Muted because we handle audio separately in a real stitch
-                     />
-                ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500 space-y-4">
-                         <Film size={48} className="opacity-20" />
-                         <span className="text-xs uppercase tracking-widest opacity-50">Scene {currentSceneIndex + 1} Pending</span>
-                    </div>
-                )}
-                
-                {/* Text Overlay */}
-                {project.scenes[currentSceneIndex]?.textOverlay && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h2 className={`text-4xl md:text-6xl font-black text-white text-center drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] px-6 ${project.scenes[currentSceneIndex].textOverlay.length > 20 ? 'text-2xl' : ''}`}>
-                            {project.scenes[currentSceneIndex].textOverlay}
-                        </h2>
-                    </div>
-                )}
+                {/* Render ALL video elements, control visibility via state */}
+                {project.scenes.map((scene, idx) => (
+                    <video
+                        key={scene.id}
+                        ref={el => videoRefs.current[idx] = el}
+                        src={scene.videoUrl}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={{ display: idx === 0 ? 'block' : 'none' }}
+                        muted // Muted as we use separate audio tracks
+                        playsInline
+                    />
+                ))}
 
-                {/* Controls Overlay */}
+                {/* Overlays */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                    <h2 className="text-4xl md:text-6xl font-black text-white text-center drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] px-6">
+                        {project.scenes[activeSceneIndex]?.textOverlay}
+                    </h2>
+                </div>
+
+                {/* Controls */}
                 <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between z-20">
                     <div className="flex items-center gap-4">
                         <button 
@@ -331,19 +318,17 @@ const ProjectBoard: React.FC<{
                         </button>
                         <div className="flex flex-col">
                             <span className="text-white font-bold text-sm tracking-wide">
-                                SCENE {currentSceneIndex + 1} / {project.scenes.length}
+                                {formatTime(currentTime)} / {formatTime(totalDuration)}
                             </span>
                             <span className="text-white/60 text-xs font-mono">
-                                {project.scenes[currentSceneIndex]?.visualPrompt.substring(0, 30)}...
+                                PHASE: FINAL MIX
                             </span>
                         </div>
                     </div>
-                    {project.musicUrl && (
-                        <div className="flex items-center gap-2 text-white/50 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
-                            <Music size={12} />
-                            <span className="text-xs font-bold uppercase">{project.musicMood}</span>
-                        </div>
-                    )}
+                     <div className="flex items-center gap-2 text-white/50 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
+                        <Music size={12} />
+                        <span className="text-xs font-bold uppercase">{project.musicMood}</span>
+                    </div>
                 </div>
             </div>
 
@@ -352,17 +337,14 @@ const ProjectBoard: React.FC<{
                 <p className="text-slate-600 mb-6">{project.concept}</p>
                 <div className="flex gap-4">
                     <button className="btn-primary px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800">
-                        <Download size={18} /> Export MP4
+                        <Download size={18} /> Export Mixed MP4
                     </button>
                     <button className="btn-primary px-6 py-3 bg-white text-slate-900 border-2 border-slate-900 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50">
                         Copy FFmpeg Command
                     </button>
                 </div>
                 {project.ffmpegCommand && (
-                    <div className="mt-6 p-4 bg-slate-900 rounded-lg overflow-x-auto relative group">
-                        <div className="absolute top-2 right-2 bg-slate-800 text-xs text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                            FFmpeg Stitch Command
-                        </div>
+                    <div className="mt-6 p-4 bg-slate-900 rounded-lg overflow-x-auto">
                         <code className="text-xs text-green-400 font-mono whitespace-pre">{project.ffmpegCommand}</code>
                     </div>
                 )}
@@ -370,68 +352,37 @@ const ProjectBoard: React.FC<{
           </div>
         ) : (
           <div className="space-y-6">
-            <h3 className="text-xl font-display font-bold text-slate-800">Project Ingredients</h3>
+            <h3 className="text-xl font-display font-bold text-slate-800">Master Tracks</h3>
             
-            {/* Music Ingredient */}
-            {project.musicUrl && (
-                <div className="bg-gradient-to-r from-pink-50 to-orange-50 border border-pink-100 p-4 rounded-xl flex items-center gap-4 shadow-sm">
-                    <div className="w-10 h-10 bg-pink-500 rounded-full flex items-center justify-center text-white shadow-md">
-                        <Music size={20} />
+            {/* Master Audio Tracks */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-pink-50 border border-pink-100 p-4 rounded-xl flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-pink-700 font-bold">
+                        <Mic size={18} /> Master Voiceover
                     </div>
-                    <div className="flex-1">
-                        <h4 className="font-bold text-slate-800">Background Score</h4>
-                        <p className="text-sm text-slate-500 capitalize">{project.musicMood} Theme</p>
-                    </div>
-                    <audio controls src={project.musicUrl} className="h-8 w-48" />
+                    <p className="text-xs text-slate-600 italic line-clamp-3">"{project.fullScript}"</p>
+                    {project.voiceoverUrl && <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" />}
                 </div>
-            )}
+                <div className="bg-teal-50 border border-teal-100 p-4 rounded-xl flex flex-col gap-2">
+                     <div className="flex items-center gap-2 text-teal-700 font-bold">
+                        <Music size={18} /> Master Score
+                    </div>
+                    <p className="text-xs text-slate-600 capitalize">{project.musicMood} Theme</p>
+                    {project.musicUrl && <audio controls src={project.musicUrl} className="w-full h-8 mt-2" />}
+                </div>
+            </div>
 
-            <div className="grid gap-4">
+            <h3 className="text-xl font-display font-bold text-slate-800 mt-8">Visual Timeline</h3>
+            <div className="space-y-2">
                 {project.scenes.map((scene, idx) => (
-                    <div key={scene.id} className="bg-white/50 border border-white p-4 rounded-xl flex gap-4 items-start shadow-sm transition-transform hover:scale-[1.01]">
-                        <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-sm shrink-0">
-                            {idx + 1}
+                    <div key={scene.id} className="flex items-center gap-4 p-3 bg-white border border-slate-100 rounded-lg">
+                        <div className="w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center text-xs font-bold">{idx + 1}</div>
+                        <div className="w-24 aspect-video bg-black rounded overflow-hidden">
+                             {scene.videoUrl && <video src={scene.videoUrl} className="w-full h-full object-cover" />}
                         </div>
-                        <div className="flex-1 space-y-3">
-                            <div className="flex justify-between">
-                                <span className="text-xs font-bold bg-slate-200 text-slate-700 px-2 py-1 rounded">{scene.duration}s Shot</span>
-                                <span className={`text-xs font-bold px-2 py-1 rounded ${scene.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                    {scene.status === 'complete' ? 'Ready' : 'Processing...'}
-                                </span>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 group relative overflow-hidden">
-                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-purple-600 uppercase">
-                                        <Film size={12} /> Visual Prompt
-                                    </div>
-                                    <p className="text-sm text-slate-700 italic mb-2">"{scene.visualPrompt}"</p>
-                                    {scene.videoUrl ? (
-                                        <div className="aspect-video bg-black rounded overflow-hidden relative">
-                                            <video src={scene.videoUrl} className="w-full h-full object-cover" muted onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
-                                            <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1 rounded">Hover to play</div>
-                                        </div>
-                                    ) : (
-                                        <div className="h-24 bg-slate-200 rounded flex items-center justify-center text-slate-400 text-xs">Waiting for Veo...</div>
-                                    )}
-                                </div>
-                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                    <div className="flex items-center gap-2 mb-2 text-xs font-bold text-pink-600 uppercase">
-                                        <Mic size={12} /> Script (TTS)
-                                    </div>
-                                    <p className="text-sm text-slate-700 mb-2">"{scene.scriptLine}"</p>
-                                    {scene.audioUrl ? (
-                                        <audio controls src={scene.audioUrl} className="w-full h-8" />
-                                    ) : (
-                                        <div className="h-8 bg-slate-200 rounded animate-pulse" />
-                                    )}
-                                </div>
-                            </div>
-                            {scene.textOverlay && (
-                                <div className="text-xs text-slate-500 bg-white p-2 rounded border border-slate-100 inline-block">
-                                    <span className="font-bold">Overlay:</span> {scene.textOverlay}
-                                </div>
-                            )}
+                        <div className="flex-1">
+                            <div className="text-xs font-bold text-slate-500 uppercase">Duration: {scene.duration}s</div>
+                            <div className="text-sm text-slate-800 line-clamp-1">{scene.visualPrompt}</div>
                         </div>
                     </div>
                 ))}
@@ -443,105 +394,48 @@ const ProjectBoard: React.FC<{
   );
 };
 
-// 4. Chat Bubble (Agent)
+// --- Agent Chat ---
 const AgentChat: React.FC<{
   onGenerate: (prompt: string) => void;
   isProcessing: boolean;
 }> = ({ onGenerate, isProcessing }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'model', text: 'Hello! I am your AI Creative Director. Let\'s create a world-class ad. Upload your assets and tell me what you need.', timestamp: Date.now() }
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Hello! I am your AI Creative Director. Ready to produce your ad?', timestamp: Date.now() }]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    
-    // Check if this looks like a generation request (simple heuristic for demo)
-    if (input.toLowerCase().includes('create') || input.toLowerCase().includes('make') || input.toLowerCase().includes('generate')) {
+    if (input.toLowerCase().includes('create') || input.toLowerCase().includes('generate')) {
         onGenerate(userMsg.text);
     } else {
-        // Just chat
-        const response = await GeminiService.sendChatMessage(
-             messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })),
-             userMsg.text
-        );
+        const response = await GeminiService.sendChatMessage(messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })), userMsg.text);
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: response, timestamp: Date.now() }]);
     }
   };
 
   return (
     <div className={`absolute bottom-8 right-8 z-50 transition-all duration-300 ${isOpen ? 'w-96 h-[500px]' : 'w-16 h-16'}`}>
-      {!isOpen && (
-        <button 
-          onClick={() => setIsOpen(true)}
-          className="w-16 h-16 rounded-full bg-slate-900 text-white shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"
-        >
-          <MessageSquare size={24} />
-        </button>
-      )}
-
+      {!isOpen && <button onClick={() => setIsOpen(true)} className="w-16 h-16 rounded-full bg-slate-900 text-white shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"><MessageSquare size={24} /></button>}
       {isOpen && (
         <div className="w-full h-full flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden ring-4 ring-slate-900/5">
-          {/* Header */}
           <div className="bg-slate-900 text-white p-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="font-bold font-display">Creative Director</span>
-            </div>
-            <button onClick={() => setIsOpen(false)} className="opacity-70 hover:opacity-100">
-                <X size={18} />
-            </button>
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="font-bold font-display">Creative Director</span></div>
+            <button onClick={() => setIsOpen(false)} className="opacity-70 hover:opacity-100"><X size={18} /></button>
           </div>
-
-          {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-            {messages.map(msg => (
-                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                        msg.role === 'user' 
-                        ? 'bg-pink-500 text-white rounded-br-none' 
-                        : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'
-                    }`}>
-                        {msg.text}
-                    </div>
-                </div>
-            ))}
-            {isProcessing && (
-                <div className="flex justify-start">
-                    <div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500">
-                        <Loader2 className="animate-spin" size={12} />
-                        Thinking & Producing...
-                    </div>
-                </div>
-            )}
+            {messages.map(msg => (<div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'}`}>{msg.text}</div></div>))}
+            {isProcessing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Loader2 className="animate-spin" size={12} />Producing Ad...</div></div>}
           </div>
-
-          {/* Input */}
           <div className="p-3 bg-white border-t border-slate-100">
             <div className="flex gap-2">
-                <input 
-                    type="text" 
-                    className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500"
-                    placeholder="Describe your ad..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                />
-                <button 
-                    onClick={handleSend}
-                    className="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800"
-                >
-                    <ArrowUpCircle size={20} />
-                </button>
+                <input type="text" className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500" placeholder="Type request..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} />
+                <button onClick={handleSend} className="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800"><ArrowUpCircle size={20} /></button>
             </div>
           </div>
         </div>
@@ -550,32 +444,19 @@ const AgentChat: React.FC<{
   );
 };
 
-
 // --- Main App ---
-
 export default function App() {
   const [apiKeyReady, setApiKeyReady] = useState(false);
   const [referenceFiles, setReferenceFiles] = useState<ReferenceFile[]>([]);
-  const [settings, setSettings] = useState<ProjectSettings>({
-    customScript: '',
-    musicTheme: '',
-    useTextOverlays: 'auto',
-    preferredVoice: 'auto',
-    aspectRatio: AspectRatio.SixteenNine
-  });
+  const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine });
   const [project, setProject] = useState<AdProject | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Initialize API Key via AI Studio standard
   useEffect(() => {
     const initKey = async () => {
         if (window.aistudio) {
             const hasKey = await window.aistudio.hasSelectedApiKey();
             if (hasKey) {
-                // In the real window.aistudio environment, the key is injected into env or handled by the proxy.
-                // For this code structure, we assume we need to pass a key string or the library handles it.
-                // The prompt says "The selected API key is available via process.env.API_KEY".
-                // Since this runs in browser, we rely on the environment being shimmed correctly.
                 GeminiService.initializeGemini(process.env.API_KEY || 'VALID_KEY_PLACEHOLDER');
                 setApiKeyReady(true);
             }
@@ -592,67 +473,52 @@ export default function App() {
              GeminiService.initializeGemini(process.env.API_KEY || 'VALID_KEY_PLACEHOLDER');
              setApiKeyReady(true);
         }
-    } else {
-        alert("AI Studio environment not detected. Please ensure this app runs within the Google AI Studio IDX or compatible environment.");
-    }
+    } else { alert("AI Studio environment not detected."); }
   };
 
   const handleGenerateProject = async (prompt: string) => {
     setIsProcessing(true);
     try {
-        // 1. Plan the Ad
+        // Phase 1: Planning
         const plan = await GeminiService.generateAdPlan(prompt, settings, referenceFiles);
-        
         const newProject: AdProject = {
-            title: plan.title,
-            concept: plan.concept,
-            musicMood: plan.musicMood,
-            musicUrl: undefined,
+            title: plan.title, concept: plan.concept, musicMood: plan.musicMood, fullScript: plan.fullScript,
             scenes: plan.scenes.map((s: any) => ({ ...s, status: 'pending' })),
-            ffmpegCommand: plan.ffmpegCommand,
-            isGenerating: true
+            ffmpegCommand: plan.ffmpegCommand, isGenerating: true, currentPhase: 'planning'
         };
-
         setProject(newProject);
 
-        // 2. Generate Music (Parallel Start)
-        GeminiService.generateMusic(plan.musicMood).then(url => {
-            setProject(prev => prev ? ({ ...prev, musicUrl: url }) : null);
-        });
-
-        // 3. Generate Assets (Sequential for demo clarity/rate limits)
+        // Phase 2: Video Production (Parallel scenes)
+        setProject(prev => prev ? ({...prev, currentPhase: 'video_production'}) : null);
         const updatedScenes = [...newProject.scenes];
-
+        // Sequentially generate scenes to avoid rate limits in demo, but show as "Phase 2"
         for (let i = 0; i < updatedScenes.length; i++) {
-            // Update status
-            updatedScenes[i].status = 'generating_video';
-            setProject(prev => prev ? ({ ...prev, scenes: [...updatedScenes] }) : null);
-
-            // Generate Video (Veo)
-            const videoUrl = await GeminiService.generateVideoClip(
-                updatedScenes[i].visualPrompt, 
-                settings.aspectRatio, 
-                updatedScenes[i].duration
-            );
-            
+            const videoUrl = await GeminiService.generateVideoClip(updatedScenes[i].visualPrompt, settings.aspectRatio);
             updatedScenes[i].videoUrl = videoUrl || undefined;
-            updatedScenes[i].status = 'generating_audio';
-            setProject(prev => prev ? ({ ...prev, scenes: [...updatedScenes] }) : null);
-
-            // Generate Audio (TTS)
-            const voiceToUse = settings.preferredVoice !== 'auto' ? settings.preferredVoice : TTSVoice.Kore;
-            const audioUrl = await GeminiService.generateVoiceover(updatedScenes[i].scriptLine, voiceToUse as TTSVoice);
-            
-            updatedScenes[i].audioUrl = audioUrl || undefined;
             updatedScenes[i].status = 'complete';
             setProject(prev => prev ? ({ ...prev, scenes: [...updatedScenes] }) : null);
         }
 
-        setProject(prev => prev ? ({ ...prev, isGenerating: false }) : null);
+        // Phase 3: Voiceover (Single Track)
+        setProject(prev => prev ? ({...prev, currentPhase: 'voiceover'}) : null);
+        const voiceToUse = settings.preferredVoice !== 'auto' ? settings.preferredVoice : TTSVoice.Kore;
+        const voUrl = await GeminiService.generateVoiceover(plan.fullScript, voiceToUse as TTSVoice);
+        setProject(prev => prev ? ({...prev, voiceoverUrl: voUrl || undefined}) : null);
+
+        // Phase 4: Scoring (Single Track)
+        setProject(prev => prev ? ({...prev, currentPhase: 'scoring'}) : null);
+        const musicUrl = await GeminiService.generateMusic(plan.musicMood);
+        setProject(prev => prev ? ({...prev, musicUrl}) : null);
+
+        // Phase 5: Final Mix
+        setProject(prev => prev ? ({...prev, currentPhase: 'mixing'}) : null);
+        await new Promise(r => setTimeout(r, 1000)); // Simulate stitch time
+        setProject(prev => prev ? ({...prev, currentPhase: 'ready', isGenerating: false}) : null);
 
     } catch (e) {
         console.error("Generation failed", e);
-        alert("Failed to generate project plan. See console.");
+        alert("Failed to generate project. See console.");
+        setIsProcessing(false);
     } finally {
         setIsProcessing(false);
     }
@@ -662,59 +528,23 @@ export default function App() {
     return (
         <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white space-y-6">
             <h1 className="text-5xl font-display font-bold">AdStudio<span className="text-pink-500">.ai</span></h1>
-            <p className="text-slate-400">Please select a Paid API Key (Veo requires billing).</p>
-            <button 
-                onClick={handleApiKeySelection}
-                className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:bg-pink-500 hover:text-white transition-all shadow-xl"
-            >
-                Connect Google AI Studio Key
-            </button>
-            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-xs text-slate-500 underline">Billing Documentation</a>
+            <p className="text-slate-400">Please select a Paid API Key.</p>
+            <button onClick={handleApiKeySelection} className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:bg-pink-500 hover:text-white transition-all shadow-xl">Connect Google AI Studio Key</button>
         </div>
     )
   }
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden">
-        {/* Header (Minimal) */}
         <header className="h-16 flex items-center justify-between px-6 bg-white/40 backdrop-blur-md border-b border-white/50 z-10">
-            <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg" />
-                <span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span>
-            </div>
-            <div className="flex items-center gap-4">
-                <span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span>
-                <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md">
-                    <img src="https://picsum.photos/100" alt="User" />
-                </div>
-            </div>
+            <div className="flex items-center gap-2"><div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg" /><span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span></div>
+            <div className="flex items-center gap-4"><span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span><div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md"><img src="https://picsum.photos/100" alt="User" /></div></div>
         </header>
-
-        {/* Main Grid */}
         <div className="flex-1 grid grid-cols-4 overflow-hidden relative">
-            
-            {/* Left Panel: Assets (25%) */}
-            <div className="col-span-1 border-r border-white/40 bg-white/20 backdrop-blur-md shadow-lg z-10 relative">
-                <ReferenceManager files={referenceFiles} setFiles={setReferenceFiles} />
-            </div>
-
-            {/* Middle Panel: Project (50%) */}
-            <div className="col-span-2 relative bg-white/5">
-                <ProjectBoard project={project} setProject={setProject} />
-                
-                {/* Floating Chat Bubble - Positioned absolute relative to middle panel container, actually fixed in code but conceptually here */}
-                <div className="absolute bottom-6 right-6">
-                     {/* Implemented as a fixed overlay in AgentChat component for z-index management, passed handler */}
-                </div>
-            </div>
-
-            {/* Right Panel: Settings (25%) */}
-            <div className="col-span-1 border-l border-white/40 bg-white/20 backdrop-blur-md shadow-lg z-10 relative">
-                <SettingsPanel settings={settings} setSettings={setSettings} />
-            </div>
-
+            <div className="col-span-1 border-r border-white/40 bg-white/20 backdrop-blur-md shadow-lg z-10 relative"><ReferenceManager files={referenceFiles} setFiles={setReferenceFiles} /></div>
+            <div className="col-span-2 relative bg-white/5"><ProjectBoard project={project} setProject={setProject} settings={settings} /></div>
+            <div className="col-span-1 border-l border-white/40 bg-white/20 backdrop-blur-md shadow-lg z-10 relative"><SettingsPanel settings={settings} setSettings={setSettings} /></div>
         </div>
-
         <AgentChat onGenerate={handleGenerateProject} isProcessing={isProcessing} />
     </div>
   );
