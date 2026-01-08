@@ -296,7 +296,7 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
 
             await session.setMusicGenerationConfig({
                 musicGenerationConfig: {
-                    musicGenerationMode: 'QUALITY',
+                    musicGenerationMode: 'QUALITY' as any,
                     audioFormat: 'pcm16',
                     sampleRateHz: SAMPLE_RATE
                 }
