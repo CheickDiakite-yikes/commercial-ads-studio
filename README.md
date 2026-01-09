@@ -2,58 +2,118 @@
 
 **The World-Class AI Creative Director & Production Studio**
 
-AdStudio.ai is a next-generation autonomous creative agency. Powered by Google's most advanced generative models, it acts as a fully integrated production house—conceptualizing, scripting, directing, and producing high-quality video advertisements in real-time.
+AdStudio.ai is a next-generation autonomous creative agency application. Acting as a central orchestrator, it leverages Google's most advanced generative models to conceptualize, script, direct, and produce broadcast-quality video advertisements in real-time.
 
-From analyzing brand assets to generating broadcast-ready 30-second spots with synchronized voiceovers and original scores, AdStudio.ai redefines the creative workflow.
-
----
-
-## ⚡️ Powered By
-
-*   **Gemini 3 Pro**: The Creative Director. Handles advanced reasoning, scriptwriting (perfectly timed to 30s), and visual storyboarding.
-*   **Veo 3.1**: The Cinematographer. Generates high-definition video clips (1080p/720p) adhering to the visual storyboard.
-*   **Gemini 2.5 Flash TTS**: The Voice Talent. Provides human-parity voiceovers with multiple persona options.
-*   **Lyria (Experimental)**: The Composer. Creates adaptive background scores tailored to the specific mood of the ad.
+Unlike simple video generators, AdStudio.ai simulates a full production team workflow—moving from creative briefing to storyboard, asset generation, and final non-linear editing—all within the browser.
 
 ---
 
-## 🚀 Features
+## ⚡️ The GenAI Model Stack
 
-### 🧠 Autonomous Campaign Generation
-Simply upload your assets (logos, PDFs, text) and chat with the AI. It understands your brand identity and formulates a complete creative strategy.
+This application orchestrates a specific suite of Google models, each assigned a specialized role in the production pipeline:
 
-### 🎥 Multi-Format Video Production
-Native support for:
-*   **16:9** (Landscape) for TV, YouTube, and Desktop.
-*   **9:16** (Portrait) for TikTok, Reels, and Shorts.
-
-### 🎛️ Real-Time Sequencer
-A browser-based non-linear editing timeline that stitches video, audio, and overlays instantly.
-*   **Smart Layering**: Automatic audio ducking and video transition logic.
-*   **Dynamic Overlays**: Context-aware text placement on video layers.
-
-### 📦 Export Ready
-While the browser provides an instant preview, AdStudio generates precise **FFmpeg** build commands, allowing you to render the final master file locally in full quality.
-
----
-
-## 🛠️ Usage Guide
-
-1.  **Connect**: Launch the app and securely connect your Google AI Studio API Key.
-2.  **Upload**: Add your reference materials to the Asset Manager (Left Panel).
-3.  **Configure**: Set your target aspect ratio, preferred voice, and music vibe in Studio Settings (Right Panel).
-4.  **Prompt**: Open the chat and direct the agent.
-    > *"Create a 30s high-energy ad for our new sneaker launch using the uploaded product shots."*
-5.  **Watch**: The agent executes the plan in phases—Writing, Filming, Recording, Composing, and Mixing.
+1.  **Gemini 3 Pro (`gemini-3-pro-preview`)**:
+    *   **Role**: The Creative Director & Scriptwriter.
+    *   **Task**: It analyzes uploaded assets (PDFs, Images), understands brand identity, and generates a precise JSON execution plan. It writes a timing-aware script (strictly 60-70 words for 30s spots) and visual prompts for every scene. It also intelligently decides *where* text overlays should appear on screen based on visual composition logic.
+2.  **Veo 3.1 (`veo-3.1-fast-generate-preview`)**:
+    *   **Role**: The Cinematographer.
+    *   **Task**: Generates high-definition video clips (720p) based on the scene descriptions provided by the Creative Director. It supports both **16:9** (Landscape) and **9:16** (Portrait) aspect ratios natively.
+3.  **Gemini 2.5 Flash TTS (`gemini-2.5-flash-preview-tts`)**:
+    *   **Role**: The Voice Talent.
+    *   **Task**: Converts the script into human-parity spoken audio. The app handles raw PCM audio streams, converting them to WAV blobs in the browser for immediate playback.
+4.  **Lyria (`lyria-realtime-exp`)**:
+    *   **Role**: The Composer (Experimental).
+    *   **Task**: Generates original, mood-adaptive background scores.
+    *   *Note*: Includes a robust fallback system to stock audio if the experimental real-time stream encounters latency or connection issues.
 
 ---
 
-## 💻 Tech Stack
+## 🏗️ Architecture & Workflow
 
-*   **Framework**: React 19 + TypeScript
-*   **Styling**: Tailwind CSS + Custom "Memphis" Design System
-*   **AI Integration**: `@google/genai` SDK (v1.34.0)
+The application follows a strictly typed, 5-phase production pipeline:
+
+### Phase 1: Planning & Briefing
+*   **Input**: User prompts + Uploaded Reference Files (Images/PDFs).
+*   **Process**: Gemini 3 Pro generates an `AdProject` object containing the title, concept, music mood, full script, and a scene-by-scene breakdown.
+*   **Intelligence**: The model calculates negative space for text overlays (e.g., placing text "Top-Left" if the subject is in the center).
+
+### Phase 2: Video Production (Parallel)
+*   **Process**: The app iterates through the scene list.
+*   **Optimization**: Scenes are generated via Veo. 
+*   **State Management**: Real-time status updates (`pending` -> `generating` -> `complete`) are reflected in the UI.
+
+### Phase 3: Voiceover Recording
+*   **Process**: The generated script is sent to the TTS model.
+*   **Audio Processing**: The raw PCM byte stream is captured, headers are applied, and a Blob URL is created for the `<audio>` element.
+
+### Phase 4: Scoring
+*   **Process**: The "Music Mood" identified in Phase 1 is sent to Lyria.
+*   **Duration Matching**: The system requests a stream length matching the ad duration (30s).
+
+### Phase 5: Final Mix & Stitch
+*   **The Sequencer**: A custom-built React player that synchronizes:
+    1.  The HTML5 `<audio>` track for Voiceover.
+    2.  The HTML5 `<audio>` track for Music (ducked volume).
+    3.  A stack of HTML5 `<video>` elements that toggle opacity based on the playback timestamp.
+    4.  A CSS-based Overlay system that renders text dynamically.
 
 ---
 
-*Note: This application leverages experimental models. Ensure your API key has billing enabled for access to Veo and Lyria.*
+## 🚀 Key Features
+
+### 🧠 Intelligent Overlay Placement
+The AI doesn't just write text; it designs the frame. The Creative Director analyzes the visual prompt it created and determines the optimal position (`top-left`, `bottom-right`, `center`, etc.) and size (`small`, `xl`) for the text to ensure it doesn't obscure the product or subject.
+
+### 🎛️ The Studio Interface
+*   **Asset Manager**: Drag-and-drop reference images and documents that Ground the AI's creativity.
+*   **Settings Panel**:
+    *   **Aspect Ratio**: Toggle between TV/Youtube (16:9) and Social (9:16) formats.
+    *   **Voice Casting**: Select specific voice personas (Puck, Kore, Fenrir, etc.).
+    *   **Overlay Controls**: Toggle text on/off or set custom fonts.
+*   **Floating Creative Director**: A non-intrusive chat interface to refine the concept or iterate on specific details.
+
+### 📦 Production Export
+While the browser provides a high-fidelity preview, the app generates a copy-pasteable **FFmpeg** command. This allows the user to render the final asset locally, stitching the actual video files and audio tracks into a single `.mp4` master file with exact timing.
+
+---
+
+## 💻 Technical Stack
+
+*   **Frontend**: React 19, TypeScript, Vite.
+*   **Styling**: Tailwind CSS with a custom "Memphis" glassmorphism design system.
+*   **Icons**: `lucide-react`.
+*   **AI SDK**: `@google/genai` (v1.34.0).
+
+---
+
+## 🛠️ Usage
+
+### Prerequisites
+1.  **Google Cloud Project**: You must have a GCP project with the Gemini API enabled.
+2.  **Billing**: Veo and Lyria are paid/experimental models and require a billing-enabled project.
+
+### Environment Setup
+You can run this locally or deploy it.
+
+**Option A: Environment Variable**
+Create a `.env` file in the root:
+```bash
+API_KEY=your_google_ai_studio_key
+```
+
+**Option B: UI Selector**
+If no environment variable is found, the app will launch in "Kiosk Mode" and prompt the user to securely select their Google Cloud Project API Key via the Google AI Studio integration window.
+
+### Running the App
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## 🔮 Future Roadmap
+
+*   **Shot-by-Shot Refinement**: Allow users to regenerate specific scenes without re-rolling the entire ad.
+*   **User Audio Upload**: Allow users to upload their own voiceover or music tracks.
+*   **Style Transfer**: Use Gemini to rewrite the script in specific styles (e.g., "Gen Z", "Formal Luxury").
