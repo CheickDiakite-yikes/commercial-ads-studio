@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig } from './types';
 import * as GeminiService from './services/geminiService';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye } from 'lucide-react';
 
 // --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
@@ -785,10 +785,12 @@ const ProjectBoard: React.FC<{
 const AgentChat: React.FC<{
   onGenerate: (prompt: string) => void;
   isProcessing: boolean;
-}> = ({ onGenerate, isProcessing }) => {
+  project?: AdProject | null;
+}> = ({ onGenerate, isProcessing, project }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Hello! I am your AI Creative Director. Ready to produce your ad?', timestamp: Date.now() }]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages]);
@@ -798,10 +800,19 @@ const AgentChat: React.FC<{
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    
     if (input.toLowerCase().includes('create') || input.toLowerCase().includes('generate')) {
         onGenerate(userMsg.text);
     } else {
-        const response = await GeminiService.sendChatMessage(messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })), userMsg.text);
+        setIsAnalyzing(true);
+        // Pass current project state (including video URLs) to the Chat Agent
+        // NOTE: If this is the first time we are discussing the project, the service will attach the videos.
+        const response = await GeminiService.sendChatMessage(
+            messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })), 
+            userMsg.text,
+            project || undefined
+        );
+        setIsAnalyzing(false);
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: response, timestamp: Date.now() }]);
     }
   };
@@ -817,7 +828,10 @@ const AgentChat: React.FC<{
           </div>
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
             {messages.map(msg => (<div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'}`}>{msg.text}</div></div>))}
+            
+            {/* Processing States */}
             {isProcessing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Loader2 className="animate-spin" size={12} />Producing Ad...</div></div>}
+            {isAnalyzing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Eye className="animate-pulse" size={12} />Analyzing Video Context...</div></div>}
           </div>
           <div className="p-3 bg-white border-t border-slate-100">
             <div className="flex gap-2">
@@ -1015,7 +1029,7 @@ export function App() {
             )}
         </div>
         
-        <AgentChat onGenerate={handleGenerateProject} isProcessing={isProcessing} />
+        <AgentChat onGenerate={handleGenerateProject} isProcessing={isProcessing} project={project} />
     </div>
   );
 }

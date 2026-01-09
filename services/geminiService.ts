@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
-import { AspectRatio, ProjectSettings, ReferenceFile, TTSVoice } from "../types";
+import { AspectRatio, ProjectSettings, ReferenceFile, TTSVoice, AdProject } from "../types";
 
 // --- AUDIO UTILITIES (PCM to WAV) ---
 
@@ -70,6 +70,24 @@ const parseDataUrl = (dataUrl: string) => {
         console.error("Data URL Parsing failed", e);
         return null;
     }
+};
+
+// --- HELPER: FETCH BLOB AND CONVERT TO BASE64 ---
+const urlToBase64 = async (url: string): Promise<string> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const result = reader.result as string;
+            // Handle both data URL (with prefix) and raw base64 situations if they arise, 
+            // though FileReader.readAsDataURL always returns data:mime;base64,...
+            const base64 = result.includes(',') ? result.split(',')[1] : result;
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 };
 
 
@@ -426,14 +444,73 @@ export const generateMusic = async (moodDescription: string, durationSeconds: nu
 };
 
 // --- 5. Chat Helper ---
-export const sendChatMessage = async (history: any[], message: string) => {
+export const sendChatMessage = async (history: any[], message: string, project?: AdProject) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // Prepare the message parts with the user's text
+    let parts: any[] = [{ text: message }];
+
+    // Prepare system instructions with enhanced context if project exists
+    let systemInstruction = "You are a helpful AI Creative Director. You are an expert in video production, editing, and storytelling.";
+    
+    if (project) {
+        systemInstruction += `\n\nCURRENT PROJECT CONTEXT:
+        Title: "${project.title}"
+        Concept: "${project.concept}"
+        Music Mood: "${project.musicMood}"
+        Script: "${project.fullScript}"
+        Scene Count: ${project.scenes.length}
+        
+        When asked to critique or review, analyze the attached video clips for consistency, lighting, composition, and relevance to the script.
+        `;
+
+        // Attach video context if scenes are complete
+        if (project.scenes && project.scenes.length > 0) {
+            try {
+                const completedScenes = project.scenes.filter(s => s.status === 'complete' && s.videoUrl);
+                
+                if (completedScenes.length > 0) {
+                    console.log(`[Chat] Attaching ${completedScenes.length} video clips for context...`);
+                    
+                    const videoParts = await Promise.all(
+                        completedScenes.map(async (s) => {
+                            if (!s.videoUrl) return null;
+                            const base64 = await urlToBase64(s.videoUrl);
+                            return {
+                                inlineData: {
+                                    mimeType: 'video/mp4',
+                                    data: base64
+                                }
+                            };
+                        })
+                    );
+                    
+                    const validVideoParts = videoParts.filter(p => p !== null);
+                    if (validVideoParts.length > 0) {
+                        // Prepend video parts to the message content so the model "sees" them before the text question
+                        parts = [...validVideoParts, ...parts];
+                        // Add a text note about what these videos are
+                        parts.push({ text: `\n\n[SYSTEM NOTE]: The user has attached ${validVideoParts.length} generated video scenes from the current project for your review.`});
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to attach video context to chat", e);
+            }
+        }
+    }
+
     const chat = ai.chats.create({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-pro-preview', // Supports Multimodal Video Input
         history: history,
-        config: { systemInstruction: "Helpful AI Assistant." }
+        config: { 
+            systemInstruction: systemInstruction
+        }
     });
     
-    const result = await chat.sendMessage({ message });
+    // Correct usage for sendMessage with multimodal content: pass the 'message' property with parts array.
+    const result = await chat.sendMessage({ 
+        message: parts
+    });
+    
     return result.text;
 }
