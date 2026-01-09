@@ -55,6 +55,7 @@ export interface AdProject {
   scenes: Scene[];
   voiceoverUrl?: string; // Single audio file for the whole ad
   musicUrl?: string;     // Single audio file for the whole ad
+  visualAnchor?: string; // Data URL of the master visual reference (Character/Product)
   
   // State
   ffmpegCommand?: string;

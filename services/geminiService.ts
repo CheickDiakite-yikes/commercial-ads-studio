@@ -55,6 +55,23 @@ const pcmToWavBlob = (pcmData: Uint8Array, sampleRate: number, channels: number)
     return new Blob([header, pcmData], { type: 'audio/wav' });
 };
 
+// --- DATA URL PARSING ---
+const parseDataUrl = (dataUrl: string) => {
+    try {
+        const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            throw new Error("Invalid Data URL format");
+        }
+        return {
+            mimeType: matches[1],
+            base64: matches[2]
+        };
+    } catch (e) {
+        console.error("Data URL Parsing failed", e);
+        return null;
+    }
+};
+
 
 // --- 1. The Creative Director Agent ---
 
@@ -165,13 +182,16 @@ export const generateAdPlan = async (
 
 export const generateVideoClip = async (
   visualPrompt: string, 
-  aspectRatio: AspectRatio, 
+  aspectRatio: AspectRatio,
+  visualAnchorDataUrl?: string 
 ): Promise<string | null> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
     
+    console.log(`[Veo] Starting generation. Prompt: "${visualPrompt.substring(0, 30)}..." | Anchor: ${!!visualAnchorDataUrl}`);
+
     try {
-        let operation = await ai.models.generateVideos({
+        let requestPayload: any = {
             model: 'veo-3.1-fast-generate-preview',
             prompt: visualPrompt,
             config: {
@@ -179,24 +199,49 @@ export const generateVideoClip = async (
                 resolution: '720p',
                 aspectRatio: aspect
             }
-        });
+        };
+
+        // If Visual Anchor exists, inject it into the payload
+        if (visualAnchorDataUrl) {
+            const parsed = parseDataUrl(visualAnchorDataUrl);
+            if (parsed) {
+                console.log(`[Veo] Attaching Visual Anchor (${parsed.mimeType})`);
+                requestPayload.image = {
+                    imageBytes: parsed.base64,
+                    mimeType: parsed.mimeType
+                };
+            } else {
+                console.warn("[Veo] Visual Anchor provided but failed to parse. Proceeding with text-only.");
+            }
+        }
+
+        let operation = await ai.models.generateVideos(requestPayload);
+
+        console.log(`[Veo] Operation started. Name: ${operation.name}`);
 
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 5000));
             operation = await ai.operations.getVideosOperation({ operation: operation });
+            console.log(`[Veo] Polling... Done: ${operation.done}`);
         }
 
         const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!videoUri) return null;
+        if (!videoUri) {
+            console.error("[Veo] No video URI in response", operation);
+            return null;
+        }
 
+        console.log("[Veo] Download URI received. Fetching binary...");
         const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
         if (!response.ok) throw new Error(`Video fetch failed: ${response.status}`);
         
         const blob = await response.blob();
-        return URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob);
+        console.log(`[Veo] Video blob created: ${objectUrl}`);
+        return objectUrl;
 
     } catch (error) {
-        console.error("Veo Error:", error);
+        console.error("[Veo] Generation Error:", error);
         return null;
     }
 };

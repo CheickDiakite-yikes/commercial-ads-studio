@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig } from './types';
 import * as GeminiService from './services/geminiService';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User } from 'lucide-react';
 
 // --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
   files: ReferenceFile[];
   setFiles: React.Dispatch<React.SetStateAction<ReferenceFile[]>>;
-}> = ({ files, setFiles }) => {
+  visualAnchor: ReferenceFile | null;
+  setVisualAnchor: React.Dispatch<React.SetStateAction<ReferenceFile | null>>;
+}> = ({ files, setFiles, visualAnchor, setVisualAnchor }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const anchorInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isAnchor: boolean = false) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
@@ -22,47 +25,103 @@ const ReferenceManager: React.FC<{
           content: event.target?.result as string, 
           previewUrl: file.type.includes('image') ? URL.createObjectURL(file) : undefined
         };
-        setFiles(prev => [...prev, newFile]);
+        if (isAnchor) {
+            setVisualAnchor(newFile);
+        } else {
+            setFiles(prev => [...prev, newFile]);
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
   return (
-    <div className="h-full flex flex-col p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-display font-bold text-slate-800">Assets</h2>
-        <button 
-          onClick={() => fileInputRef.current?.click()}
-          className="p-2 bg-slate-900 text-white rounded-full hover:bg-pink-500 transition-colors shadow-lg"
+    <div className="h-full flex flex-col p-6 space-y-8">
+      
+      {/* Visual Anchor Section */}
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <User size={14} /> Visual Anchor
+            </h2>
+             {visualAnchor && (
+                <button 
+                  onClick={() => setVisualAnchor(null)}
+                  className="text-xs text-red-400 hover:text-red-500 font-bold"
+                >
+                  Clear
+                </button>
+            )}
+        </div>
+        
+        <div 
+            onClick={() => anchorInputRef.current?.click()}
+            className={`
+                relative h-40 rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden group
+                ${visualAnchor 
+                    ? 'border-pink-500 bg-pink-50' 
+                    : 'border-slate-300 hover:border-pink-400 hover:bg-white/50 bg-slate-50'}
+            `}
         >
-          <Plus size={20} />
-        </button>
-        <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf,text/plain" />
+            <input type="file" ref={anchorInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
+            
+            {visualAnchor ? (
+                <>
+                    <img src={visualAnchor.previewUrl} alt="Anchor" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-white font-bold text-sm">Change Anchor</span>
+                    </div>
+                </>
+            ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+                    <ImagePlus size={32} />
+                    <span className="text-xs font-bold text-center px-4">Upload Character or<br/>Product Reference</span>
+                </div>
+            )}
+        </div>
+        <p className="text-[10px] text-slate-400 leading-tight">
+            This image will be used as a strict visual reference for <strong>every</strong> generated scene to ensure consistency.
+        </p>
       </div>
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-        {files.length === 0 && (
-            <div className="text-slate-400 text-sm text-center mt-10 italic">No assets uploaded.</div>
-        )}
-        {files.map(file => (
-          <div key={file.id} className="memphis-card p-3 rounded-xl relative group">
+
+      <hr className="border-slate-200" />
+
+      {/* General Assets Section */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-display font-bold text-slate-800">Assets</h2>
             <button 
-              onClick={() => setFiles(prev => prev.filter(f => f.id !== file.id))}
-              className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 bg-slate-900 text-white rounded-full hover:bg-pink-500 transition-colors shadow-lg"
             >
-              <X size={12} />
+            <Plus size={20} />
             </button>
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
-                {file.type === 'image' && file.previewUrl ? <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" /> : <FileText className="text-slate-400" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
-                <p className="text-xs text-slate-500 uppercase">{file.type}</p>
-              </div>
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf,text/plain" onChange={(e) => handleFileUpload(e, false)} />
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {files.length === 0 && (
+                <div className="text-slate-400 text-sm text-center mt-10 italic">No general assets uploaded.</div>
+            )}
+            {files.map(file => (
+            <div key={file.id} className="memphis-card p-3 rounded-xl relative group">
+                <button 
+                onClick={() => setFiles(prev => prev.filter(f => f.id !== file.id))}
+                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                >
+                <X size={12} />
+                </button>
+                <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
+                    {file.type === 'image' && file.previewUrl ? <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" /> : <FileText className="text-slate-400" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
+                    <p className="text-xs text-slate-500 uppercase">{file.type}</p>
+                </div>
+                </div>
             </div>
-          </div>
-        ))}
+            ))}
+        </div>
       </div>
     </div>
   );
@@ -581,8 +640,8 @@ const ProjectBoard: React.FC<{
           <div className="flex flex-col items-center h-full">
             {/* Audio Elements (Hidden but Active) */}
             {/* Note: crossOrigin="anonymous" is crucial for MediaElementSource capture if served from CDN (not applicable here for blob, but good practice) */}
-            {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} volume={0.3} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} />}
-            {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} volume={1.0} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} />}
+            {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 0.3; }} />}
+            {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 1.0; }} />}
 
             {/* Video Sequencer Container */}
             <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${
@@ -593,7 +652,7 @@ const ProjectBoard: React.FC<{
                     <video
                         key={scene.id}
                         preload="auto"
-                        ref={el => videoRefs.current[idx] = el}
+                        ref={(el) => { videoRefs.current[idx] = el; }}
                         src={scene.videoUrl}
                         className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
                         style={{ 
@@ -720,7 +779,7 @@ const ProjectBoard: React.FC<{
       </div>
     </div>
   );
-};
+}
 
 // --- Agent Chat ---
 const AgentChat: React.FC<{
@@ -773,12 +832,15 @@ const AgentChat: React.FC<{
 };
 
 // --- Main App ---
-export default function App() {
+export function App() {
   // Fix: Initialize with environment variable existence to support deployed environments.
   // This allows the app to start immediately if API_KEY is set in build/deployment config.
   const [apiKeyReady, setApiKeyReady] = useState(!!process.env.API_KEY);
   
   const [referenceFiles, setReferenceFiles] = useState<ReferenceFile[]>([]);
+  // Visual Anchor State
+  const [visualAnchor, setVisualAnchor] = useState<ReferenceFile | null>(null);
+
   const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine });
   const [project, setProject] = useState<AdProject | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -821,7 +883,8 @@ export default function App() {
         const newProject: AdProject = {
             title: plan.title, concept: plan.concept, musicMood: plan.musicMood, fullScript: plan.fullScript,
             scenes: plan.scenes.map((s: any) => ({ ...s, status: 'pending' })),
-            ffmpegCommand: plan.ffmpegCommand, isGenerating: true, currentPhase: 'planning'
+            ffmpegCommand: plan.ffmpegCommand, isGenerating: true, currentPhase: 'planning',
+            visualAnchor: visualAnchor?.content // Store it in project for history/persistence
         };
         setProject(newProject);
 
@@ -830,7 +893,13 @@ export default function App() {
         const updatedScenes = [...newProject.scenes];
         // Sequentially generate scenes to avoid rate limits in demo, but show as "Phase 2"
         for (let i = 0; i < updatedScenes.length; i++) {
-            const videoUrl = await GeminiService.generateVideoClip(updatedScenes[i].visualPrompt, settings.aspectRatio);
+            // PASS THE VISUAL ANCHOR IF AVAILABLE
+            const videoUrl = await GeminiService.generateVideoClip(
+                updatedScenes[i].visualPrompt, 
+                settings.aspectRatio,
+                visualAnchor?.content // Pass base64 data to service
+            );
+            
             updatedScenes[i].videoUrl = videoUrl || undefined;
             updatedScenes[i].status = 'complete';
             setProject(prev => prev ? ({ ...prev, scenes: [...updatedScenes] }) : null);
@@ -908,7 +977,12 @@ export default function App() {
                 `}>
                     <div className="h-full relative pt-16 lg:pt-0">
                         <button onClick={() => setShowLeftPanel(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
-                        <ReferenceManager files={referenceFiles} setFiles={setReferenceFiles} />
+                        <ReferenceManager 
+                            files={referenceFiles} 
+                            setFiles={setReferenceFiles} 
+                            visualAnchor={visualAnchor}
+                            setVisualAnchor={setVisualAnchor}
+                        />
                     </div>
                 </div>
 
