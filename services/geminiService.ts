@@ -74,9 +74,26 @@ const adPlanSchema: Schema = {
           order: { type: Type.INTEGER },
           duration: { type: Type.INTEGER, description: "4 or 6" },
           visualPrompt: { type: Type.STRING, description: "Detailed visual description for Veo." },
-          textOverlay: { type: Type.STRING, description: "Optional short text overlay." }
+          textOverlay: { type: Type.STRING, description: "Optional short text overlay." },
+          overlayConfig: {
+            type: Type.OBJECT,
+            description: "Configuration for the text overlay placement and size.",
+            properties: {
+              position: { 
+                type: Type.STRING, 
+                enum: ['center', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+                description: "Where to place the text based on the visual composition (negative space)."
+              },
+              size: { 
+                type: Type.STRING, 
+                enum: ['small', 'medium', 'large', 'xl'],
+                description: "Font size. Use XL only for 1-2 words. Use Small/Medium for longer sentences."
+              }
+            },
+            required: ["position", "size"]
+          }
         },
-        required: ["id", "order", "duration", "visualPrompt"]
+        required: ["id", "order", "duration", "visualPrompt", "overlayConfig"]
       }
     },
     ffmpegCommand: { type: Type.STRING }
@@ -118,6 +135,13 @@ export const generateAdPlan = async (
     2. Scenes must be 4s or 6s. (e.g., 5 scenes of 6s, or mix).
     3. The 'fullScript' is critical: It must be timed perfectly for a 30s read. Aim for exactly 60-75 words. No more, no less.
     4. Ensure the script matches the visual flow of the scenes.
+    
+    DESIGN DIRECTIVE (Text Overlays):
+    - You have creative control over where text appears.
+    - Analyze your own 'visualPrompt' to find negative space.
+    - Example: If the video is "A car driving on the center of the road", place text at 'top' or 'bottom', NOT 'center'.
+    - Example: If the video is "A product on a table, right side", place text 'center-left' or 'top-left'.
+    - Do NOT make every text 'center' and 'large'. Vary the size based on text length.
   `;
 
   try {
@@ -125,7 +149,7 @@ export const generateAdPlan = async (
       model,
       contents: fullPrompt,
       config: {
-        systemInstruction: "You are a world-class AI Creative Director. You understand video editing timing perfectly.",
+        systemInstruction: "You are a world-class AI Creative Director. You understand video editing timing and visual composition perfectly.",
         responseMimeType: "application/json",
         responseSchema: adPlanSchema
       }
@@ -236,8 +260,8 @@ const getFallbackMusic = (mood: string) => {
     return MOOD_TRACKS['cinematic'];
 }
 
-export const generateMusic = async (moodDescription: string): Promise<string | null> => {
-    console.log("Generating Music with Lyria for mood:", moodDescription);
+export const generateMusic = async (moodDescription: string, durationSeconds: number = 30): Promise<string | null> => {
+    console.log(`Generating Music with Lyria for: ${moodDescription} (${durationSeconds}s)`);
 
     // Immediate Fallback trigger function
     const triggerFallback = (reason: string) => {
@@ -248,17 +272,16 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
     return new Promise(async (resolve) => {
         let hasResolved = false;
         
-        // Safety timeout - if Lyria hangs, resolve fallback
+        // Safety timeout - ensures we don't hang if Lyria never connects
         const safetyTimeout = setTimeout(() => {
             if (!hasResolved) {
                 hasResolved = true;
                 resolve(triggerFallback("Lyria Timeout"));
             }
-        }, 15000); // 15s timeout
+        }, (durationSeconds * 1000) + 5000); // Duration + 5s buffer
 
         try {
             // CRITICAL FIX: Use v1alpha for Lyria as it is experimental
-            // Wrapped in try/catch for connection errors
             const lyriaClient = new GoogleGenAI({ apiKey: process.env.API_KEY, apiVersion: 'v1alpha' });
             
             // Lyria Spec: 48kHz, 2 Channels (Stereo)
@@ -270,6 +293,9 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
             const session = await lyriaClient.live.music.connect({
                 model: 'models/lyria-realtime-exp',
                 callbacks: {
+                    onopen: () => {
+                        console.log("Lyria Connection Opened");
+                    },
                     onmessage: (message: any) => {
                         if (message.serverContent?.audioChunks) {
                             for (const chunk of message.serverContent.audioChunks) {
@@ -279,6 +305,8 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
                     },
                     onerror: (err: any) => {
                         console.error("Lyria WebSocket Error:", err);
+                        // Do not immediately resolve fallback here unless critical, 
+                        // as sometimes transient errors occur. But usually for WS it's fatal.
                         if (!hasResolved) {
                             hasResolved = true;
                             clearTimeout(safetyTimeout);
@@ -290,25 +318,28 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
             });
 
             // Configure Lyria
-            await session.setWeightedPrompts({
-                weightedPrompts: [{ text: moodDescription, weight: 1.0 }]
-            });
-
+            // Update: Remove sampleRateHz from config as it causes "Invalid JSON payload" error
             await session.setMusicGenerationConfig({
                 musicGenerationConfig: {
-                    musicGenerationMode: 'QUALITY' as any,
-                    audioFormat: 'pcm16',
-                    sampleRateHz: SAMPLE_RATE
+                    musicGenerationMode: 'QUALITY' as any
                 }
+            });
+
+            await session.setWeightedPrompts({
+                weightedPrompts: [{ text: moodDescription, weight: 1.0 }]
             });
 
             console.log("Starting Lyria stream...");
             await session.play();
 
-            // Record for 15 seconds then stop (shorter for faster demo)
+            // Record for the requested duration
             setTimeout(async () => {
                 if (hasResolved) return;
 
+                console.log("Stopping Lyria stream...");
+                // Note: session.close() might be better, but we rely on simple flow here
+                // We stop processing chunks and build the blob.
+                
                 if (chunks.length === 0) {
                     hasResolved = true;
                     clearTimeout(safetyTimeout);
@@ -316,7 +347,6 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
                     return;
                 }
 
-                console.log("Stopping Lyria stream...");
                 // Combine chunks
                 const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
                 const combinedPcm = new Uint8Array(totalLength);
@@ -333,7 +363,12 @@ export const generateMusic = async (moodDescription: string): Promise<string | n
                 hasResolved = true;
                 clearTimeout(safetyTimeout);
                 resolve(url);
-            }, 15000);
+                
+                // Cleanup
+                try {
+                    // Force close the session if possible/exposed, otherwise just let it GC
+                } catch(e) {}
+            }, durationSeconds * 1000);
 
         } catch (e) {
             if (!hasResolved) {

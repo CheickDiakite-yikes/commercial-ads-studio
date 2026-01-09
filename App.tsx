@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice } from './types';
+import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig } from './types';
 import * as GeminiService from './services/geminiService';
 import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu } from 'lucide-react';
 
@@ -124,6 +124,40 @@ const SettingsPanel: React.FC<{
   );
 };
 
+// --- Helper for Text Overlays ---
+const getOverlayClasses = (config?: OverlayConfig) => {
+    const pos = config?.position || 'center';
+    const size = config?.size || 'large';
+    
+    // Base classes (with responsive padding safe zones)
+    let containerClasses = "absolute inset-0 pointer-events-none flex p-8 md:p-16 z-20 transition-all duration-500";
+    let textClasses = "font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] leading-tight";
+
+    // Position Mapping
+    switch(pos) {
+        case 'top-left': containerClasses += " items-start justify-start text-left"; break;
+        case 'top-right': containerClasses += " items-start justify-end text-right"; break;
+        case 'bottom-left': containerClasses += " items-end justify-start text-left"; break;
+        case 'bottom-right': containerClasses += " items-end justify-end text-right"; break;
+        case 'top': containerClasses += " items-start justify-center text-center"; break;
+        case 'bottom': containerClasses += " items-end justify-center text-center"; break;
+        case 'center': 
+        default: containerClasses += " items-center justify-center text-center"; break;
+    }
+
+    // Size Mapping (Relative to viewport)
+    // Toned down slightly to ensure it fits better on screens as per user feedback
+    switch(size) {
+        case 'small': textClasses += " text-lg md:text-2xl max-w-sm"; break;
+        case 'medium': textClasses += " text-2xl md:text-4xl max-w-xl"; break;
+        case 'xl': textClasses += " text-5xl md:text-7xl max-w-4xl"; break;
+        case 'large': 
+        default: textClasses += " text-3xl md:text-5xl max-w-3xl"; break;
+    }
+    
+    return { containerClasses, textClasses };
+};
+
 // --- Middle Panel: Advanced Sequencer Player ---
 const ProjectBoard: React.FC<{
   project: AdProject | null;
@@ -197,11 +231,6 @@ const ProjectBoard: React.FC<{
         } else {
             vid.style.opacity = '0';
             vid.style.zIndex = '0';
-            
-            // Optional: Seek inactive videos to 0 if they are far behind/ahead, 
-            // but for gapless, keeping them playing (looping) in the background is smoothest 
-            // if we don't care about CPU. For a 5-video ad, this is acceptable.
-            // If optimization is needed, we would pause non-neighbors.
         }
     });
 
@@ -235,6 +264,12 @@ const ProjectBoard: React.FC<{
       }
   }, [currentTime]);
 
+  const handleAudioError = (source: string, e: any) => {
+      // Prevent circular JSON error by logging safe strings instead of the event object
+      const errorMsg = e instanceof Error ? e.message : 'Unknown playback error';
+      console.error(`${source} Playback Error:`, errorMsg, e.target?.src || 'No src');
+  };
+
   if (!project) {
     return (
         <div className="h-full flex items-center justify-center text-slate-400 font-display">
@@ -251,6 +286,10 @@ const ProjectBoard: React.FC<{
       const s = Math.floor(time % 60);
       return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
+
+  const activeScene = project.scenes[activeSceneIndex];
+  const overlayConfig = activeScene?.overlayConfig;
+  const { containerClasses, textClasses } = getOverlayClasses(overlayConfig);
 
   return (
     <div className="h-full flex flex-col">
@@ -304,8 +343,8 @@ const ProjectBoard: React.FC<{
           <div className="flex flex-col items-center h-full">
             {/* Audio Elements (Hidden but Active) */}
             {/* Note: We force re-render when URLs change to ensure new Blobs are loaded */}
-            {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} volume={0.3} />}
-            {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} volume={1.0} />}
+            {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} volume={0.3} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} />}
+            {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} volume={1.0} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} />}
 
             {/* Video Sequencer Container */}
             <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${
@@ -329,10 +368,10 @@ const ProjectBoard: React.FC<{
                     />
                 ))}
 
-                {/* Overlays */}
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                    <h2 className="text-2xl md:text-6xl font-black text-white text-center drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] px-6">
-                        {project.scenes[activeSceneIndex]?.textOverlay}
+                {/* Overlays with Dynamic Positioning and Sizing */}
+                <div className={containerClasses}>
+                    <h2 className={textClasses}>
+                        {activeScene?.textOverlay}
                     </h2>
                 </div>
 
@@ -391,7 +430,7 @@ const ProjectBoard: React.FC<{
                     </div>
                     <p className="text-xs text-slate-600 italic line-clamp-3">"{project.fullScript}"</p>
                     {project.voiceoverUrl ? (
-                        <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" />
+                        <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" crossOrigin="anonymous" onError={(e) => handleAudioError("Voice Master", e)} />
                     ) : (
                         <div className="text-xs text-red-400 italic">No audio generated.</div>
                     )}
@@ -402,7 +441,7 @@ const ProjectBoard: React.FC<{
                     </div>
                     <p className="text-xs text-slate-600 capitalize">{project.musicMood} Theme</p>
                      {project.musicUrl ? (
-                        <audio controls src={project.musicUrl} className="w-full h-8 mt-2" />
+                        <audio controls src={project.musicUrl} className="w-full h-8 mt-2" crossOrigin="anonymous" onError={(e) => handleAudioError("Music Master", e)} />
                     ) : (
                         <div className="text-xs text-red-400 italic">No audio generated.</div>
                     )}
@@ -420,6 +459,13 @@ const ProjectBoard: React.FC<{
                         <div className="flex-1">
                             <div className="text-xs font-bold text-slate-500 uppercase">Duration: {scene.duration}s</div>
                             <div className="text-sm text-slate-800 line-clamp-1">{scene.visualPrompt}</div>
+                            {/* Visual indicator of text placement logic */}
+                            {scene.overlayConfig && (
+                                <div className="mt-1 flex gap-2">
+                                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">Pos: {scene.overlayConfig.position}</span>
+                                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">Size: {scene.overlayConfig.size}</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -483,7 +529,10 @@ const AgentChat: React.FC<{
 
 // --- Main App ---
 export default function App() {
-  const [apiKeyReady, setApiKeyReady] = useState(false);
+  // Fix: Initialize with environment variable existence to support deployed environments.
+  // This allows the app to start immediately if API_KEY is set in build/deployment config.
+  const [apiKeyReady, setApiKeyReady] = useState(!!process.env.API_KEY);
+  
   const [referenceFiles, setReferenceFiles] = useState<ReferenceFile[]>([]);
   const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine });
   const [project, setProject] = useState<AdProject | null>(null);
@@ -493,10 +542,13 @@ export default function App() {
 
   useEffect(() => {
     const initKey = async () => {
+        // If env var is already present, we are ready.
+        if (process.env.API_KEY) return;
+
+        // Fallback for AI Studio (Veo) context
         if (window.aistudio) {
             const hasKey = await window.aistudio.hasSelectedApiKey();
             if (hasKey) {
-                // No init needed here as we use env directly
                 setApiKeyReady(true);
             }
         }
@@ -511,7 +563,9 @@ export default function App() {
         if (hasKey) {
              setApiKeyReady(true);
         }
-    } else { alert("AI Studio environment not detected."); }
+    } else { 
+        alert("This app requires an API Key. If you are deploying this app, please add your Google AI Studio API Key as an environment variable named 'API_KEY' in your deployment settings."); 
+    }
   };
 
   const handleGenerateProject = async (prompt: string) => {
@@ -568,6 +622,7 @@ export default function App() {
             <h1 className="text-4xl md:text-5xl font-display font-bold">AdStudio<span className="text-pink-500">.ai</span></h1>
             <p className="text-slate-400 max-w-md">Create world-class video ads with a fully autonomous creative director.</p>
             <button onClick={handleApiKeySelection} className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:bg-pink-500 hover:text-white transition-all shadow-xl">Connect Google AI Studio Key</button>
+            <p className="text-xs text-slate-500 max-w-xs opacity-60">If you are the developer, ensure <code>API_KEY</code> is set in your environment variables.</p>
         </div>
     )
   }

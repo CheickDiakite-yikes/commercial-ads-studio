@@ -29,12 +29,18 @@ export interface ProjectSettings {
   aspectRatio: AspectRatio;
 }
 
+export interface OverlayConfig {
+  position: 'center' | 'top' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  size: 'small' | 'medium' | 'large' | 'xl';
+}
+
 export interface Scene {
   id: string;
   order: number;
   duration: 4 | 6; // Veo 3 constraints
   visualPrompt: string;
   textOverlay: string; // Text is still per-scene
+  overlayConfig?: OverlayConfig; // AI-determined placement and size
   status: 'pending' | 'generating' | 'complete' | 'failed';
   videoUrl?: string; // The video blob
 }

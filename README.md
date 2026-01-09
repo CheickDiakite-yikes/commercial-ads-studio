@@ -2,99 +2,58 @@
 
 **The World-Class AI Creative Director & Production Studio**
 
-AdStudio.ai is a cutting-edge web application that acts as your autonomous creative agency. It leverages Google's latest Gemini models to conceptualize, script, direct, and produce high-quality video advertisements in minutes.
+AdStudio.ai is a next-generation autonomous creative agency. Powered by Google's most advanced generative models, it acts as a fully integrated production house—conceptualizing, scripting, directing, and producing high-quality video advertisements in real-time.
 
-From analyzing brand assets to generating 30-second commercial spots with synchronized voiceovers, original music scores, and Veo-generated video clips, AdStudio.ai represents the future of automated creative workflows.
+From analyzing brand assets to generating broadcast-ready 30-second spots with synchronized voiceovers and original scores, AdStudio.ai redefines the creative workflow.
 
 ---
 
-## 🚀 Key Features
+## ⚡️ Powered By
 
-### 🧠 AI Creative Director
-Powered by **Gemini 3 Pro**, the agent acts as your creative partner. It ingests your uploaded reference files (images, PDFs, text) to understand your brand identity, then generates a cohesive 30-second ad concept, complete with a perfectly timed script and visual storyboards.
+*   **Gemini 3 Pro**: The Creative Director. Handles advanced reasoning, scriptwriting (perfectly timed to 30s), and visual storyboarding.
+*   **Veo 3.1**: The Cinematographer. Generates high-definition video clips (1080p/720p) adhering to the visual storyboard.
+*   **Gemini 2.5 Flash TTS**: The Voice Talent. Provides human-parity voiceovers with multiple persona options.
+*   **Lyria (Experimental)**: The Composer. Creates adaptive background scores tailored to the specific mood of the ad.
 
-### 🎥 Generative Video Production
-Harnessing **Veo 3.1 (Fast Preview)**, AdStudio.ai generates high-fidelity video clips for every scene in your storyboard. It supports both **16:9 (Landscape)** for TV/YouTube and **9:16 (Portrait)** for TikTok/Reels/Shorts.
+---
 
-### 🗣️ Pro-Grade Voiceovers
-Utilizes **Gemini 2.5 Flash TTS** to generate human-like voiceovers. Choose from distinct personas:
-- **Puck & Charon** (Masculine)
-- **Kore, Fenrir, Zephyr, Aoede** (Feminine/Neutral)
-- **Auto-Cast**: Let the AI decide the best voice for your script's mood.
+## 🚀 Features
 
-### 🎵 Adaptive Music Scoring
-Features experimental integration with **Lyria (Realtime)** to compose original background music tailored to the emotional arc of your ad (Upbeat, Cinematic, Emotional, Corporate, Jazz). 
-*Includes a robust fallback system to high-quality stock tracks if generation times out.*
+### 🧠 Autonomous Campaign Generation
+Simply upload your assets (logos, PDFs, text) and chat with the AI. It understands your brand identity and formulates a complete creative strategy.
+
+### 🎥 Multi-Format Video Production
+Native support for:
+*   **16:9** (Landscape) for TV, YouTube, and Desktop.
+*   **9:16** (Portrait) for TikTok, Reels, and Shorts.
 
 ### 🎛️ Real-Time Sequencer
-A browser-based non-linear editor that stitches video, voiceover, and music layers in real-time.
-- **Gapless Playback**: Seamless transition between generated scenes.
-- **Layering**: Automatically handles audio ducking and video z-indexing.
-- **Text Overlays**: Dynamic titles overlaid on video segments.
+A browser-based non-linear editing timeline that stitches video, audio, and overlays instantly.
+*   **Smart Layering**: Automatic audio ducking and video transition logic.
+*   **Dynamic Overlays**: Context-aware text placement on video layers.
+
+### 📦 Export Ready
+While the browser provides an instant preview, AdStudio generates precise **FFmpeg** build commands, allowing you to render the final master file locally in full quality.
 
 ---
 
-## 🛠️ Technology Stack
+## 🛠️ Usage Guide
 
-- **Frontend**: React 19, TypeScript, Tailwind CSS
-- **AI SDK**: `@google/genai` (v1.34.0+)
-- **Models Used**:
-  - `gemini-3-pro-preview` (Reasoning, Scripting, Chat)
-  - `veo-3.1-fast-generate-preview` (Video Generation)
-  - `gemini-2.5-flash-preview-tts` (Text-to-Speech)
-  - `models/lyria-realtime-exp` (Music Generation via WebSocket)
-
----
-
-## 📋 Usage Guide
-
-### 1. Asset Ingestion (Left Panel)
-Upload your raw materials. The Creative Director reads these to ensure brand consistency.
-- **Images**: Product shots, logos.
-- **PDFs**: Brand guidelines, brochures.
-- **Text**: Slogans, key selling points.
-
-### 2. Studio Configuration (Right Panel)
-Customize the production parameters:
-- **Aspect Ratio**: Choose 16:9 or 9:16.
-- **Voice**: Select a specific narrator or leave it to the AI.
-- **Text Overlays**: Enable/Disable text on screen.
-- **Music Theme**: Define the vibe (e.g., "Cyberpunk high energy", "Soft acoustic morning").
-- **Custom Script**: Optionally provide your own copy.
-
-### 3. The Brief (Chat Agent)
-Open the chat bubble (bottom right) and talk to the Director.
-> "Create a high-energy 30s ad for our new energy drink based on the uploaded logo. Make it feel like a sports car commercial."
-
-### 4. Production Phase
-Watch the magic happen. The system executes phases in parallel:
-1.  **Planning**: Script writing & Storyboarding.
-2.  **Video**: Generating 5-6 unique clips via Veo.
-3.  **Voiceover**: Synthesizing the narrator track.
-4.  **Scoring**: Composing the soundtrack.
-5.  **Mixing**: Final assembly.
-
-### 5. Review & Export
-Watch the result in the central player.
-- **Ingredients Tab**: Review individual generated assets.
-- **Export**: Get the FFmpeg command to render a physical MP4 file locally (browser-based rendering is preview-only).
+1.  **Connect**: Launch the app and securely connect your Google AI Studio API Key.
+2.  **Upload**: Add your reference materials to the Asset Manager (Left Panel).
+3.  **Configure**: Set your target aspect ratio, preferred voice, and music vibe in Studio Settings (Right Panel).
+4.  **Prompt**: Open the chat and direct the agent.
+    > *"Create a 30s high-energy ad for our new sneaker launch using the uploaded product shots."*
+5.  **Watch**: The agent executes the plan in phases—Writing, Filming, Recording, Composing, and Mixing.
 
 ---
 
-## 🔑 Prerequisites
+## 💻 Tech Stack
 
-You need a valid **Google AI Studio API Key** with billing enabled to access the Veo and Gemini production models.
-The app handles API key input securely via the browser environment variables or the AI Studio helper.
-
----
-
-## 🎨 Design System
-
-Built with a "Memphis" design aesthetic:
-- **Fonts**: Outfit (UI) & Space Grotesk (Headers).
-- **Palette**: Slate backgrounds with vibrant accents (Pink #ff0080, Teal #00b7c2).
-- **Components**: Glassmorphism cards with neo-brutalist shadows.
+*   **Framework**: React 19 + TypeScript
+*   **Styling**: Tailwind CSS + Custom "Memphis" Design System
+*   **AI Integration**: `@google/genai` SDK (v1.34.0)
 
 ---
 
-*Note: This application uses experimental Google GenAI models. Performance and availability may vary.*
+*Note: This application leverages experimental models. Ensure your API key has billing enabled for access to Veo and Lyria.*
