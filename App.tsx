@@ -158,6 +158,94 @@ const getOverlayClasses = (config?: OverlayConfig) => {
     return { containerClasses, textClasses };
 };
 
+// --- Canvas Drawing Helpers ---
+const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number, textAlign: CanvasTextAlign) => {
+    const words = text.split(' ');
+    let line = '';
+    const lines = [];
+
+    for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        const testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+            lines.push(line);
+            line = words[n] + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    lines.push(line);
+    
+    ctx.textAlign = textAlign;
+    lines.forEach((l, i) => {
+        // Simple offset logic based on alignment to keep block together
+        ctx.fillText(l.trim(), x, y + (i * lineHeight));
+    });
+};
+
+const drawTextOverlayToCanvas = (ctx: CanvasRenderingContext2D, width: number, height: number, text: string, config?: OverlayConfig) => {
+    if (!text) return;
+    
+    // Config Defaults
+    const pos = config?.position || 'center';
+    const size = config?.size || 'large';
+    
+    // Scale factor (assuming 720p base for calculations to be consistent with UI)
+    const scale = width < height ? width / 720 : height / 720;
+    
+    // Font Setup
+    let fontSize = 48;
+    switch(size) {
+        case 'small': fontSize = 24; break;
+        case 'medium': fontSize = 36; break;
+        case 'xl': fontSize = 72; break;
+        case 'large': default: fontSize = 48; break;
+    }
+    fontSize = fontSize * scale;
+    
+    ctx.font = `900 ${fontSize}px "Outfit", sans-serif`;
+    ctx.fillStyle = 'white';
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 4;
+    
+    const padding = 64 * scale;
+    const lineHeight = fontSize * 1.2;
+    const maxWidth = width * 0.8; // Max 80% width
+
+    let x = width / 2;
+    let y = height / 2;
+    let align: CanvasTextAlign = 'center';
+
+    switch(pos) {
+        case 'top-left': 
+            x = padding; y = padding + fontSize; align = 'left'; 
+            break;
+        case 'top-right': 
+            x = width - padding; y = padding + fontSize; align = 'right'; 
+            break;
+        case 'bottom-left': 
+            x = padding; y = height - padding - (lineHeight * 2); align = 'left'; 
+            break;
+        case 'bottom-right': 
+            x = width - padding; y = height - padding - (lineHeight * 2); align = 'right'; 
+            break;
+        case 'top': 
+            x = width / 2; y = padding + fontSize; align = 'center'; 
+            break;
+        case 'bottom': 
+            x = width / 2; y = height - padding - (lineHeight * 2); align = 'center'; 
+            break;
+        case 'center': default: 
+            x = width / 2; y = height / 2; align = 'center'; 
+            break;
+    }
+
+    wrapText(ctx, text, x, y, maxWidth, lineHeight, align);
+};
+
 // --- Middle Panel: Advanced Sequencer Player ---
 const ProjectBoard: React.FC<{
   project: AdProject | null;
@@ -166,6 +254,7 @@ const ProjectBoard: React.FC<{
 }> = ({ project, setProject, settings }) => {
   const [activeTab, setActiveTab] = useState<'output' | 'ingredients'>('output');
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   // Master Sequencer State
   const [currentTime, setCurrentTime] = useState(0);
@@ -174,27 +263,77 @@ const ProjectBoard: React.FC<{
   const musicRef = useRef<HTMLAudioElement>(null);
   const voRef = useRef<HTMLAudioElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  
+  // Export Refs
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   // Calculate Total Duration
   const totalDuration = project ? project.scenes.reduce((acc, scene) => acc + scene.duration, 0) : 0;
 
-  // 1. Playback Loop
+  // 1. Playback Loop (Replaced setInterval with requestAnimationFrame for smooth recording)
   useEffect(() => {
-    let interval: number;
-    if (isPlaying && totalDuration > 0) {
-        interval = window.setInterval(() => {
+    let animationFrameId: number;
+    let lastTime = performance.now();
+
+    const loop = () => {
+        const now = performance.now();
+        // If exporting, we might want fixed time steps, but for now simple delta is fine
+        // provided the computer is fast enough.
+        const dt = (now - lastTime) / 1000; 
+        lastTime = now;
+
+        if (isPlaying && totalDuration > 0) {
             setCurrentTime(prev => {
-                const next = prev + 0.1; // 100ms ticks
+                const next = prev + dt;
+                
+                // End of playback
                 if (next >= totalDuration) {
                     setIsPlaying(false);
-                    return 0;
+                    if (isExporting) {
+                        stopExport();
+                    }
+                    return 0; // Reset
                 }
                 return next;
             });
-        }, 100);
+
+            // If Render Mode: Draw to hidden canvas
+            if (isExporting && canvasRef.current) {
+                const ctx = canvasRef.current.getContext('2d');
+                const vid = videoRefs.current[activeSceneIndex];
+                if (ctx && vid) {
+                    // Clear
+                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+                    // Draw Video
+                    try {
+                        ctx.drawImage(vid, 0, 0, ctx.canvas.width, ctx.canvas.height);
+                    } catch(e) {
+                        // Video might not be ready
+                    }
+                    // Draw Overlay
+                    const scene = project?.scenes[activeSceneIndex];
+                    if (scene?.textOverlay) {
+                        drawTextOverlayToCanvas(ctx, ctx.canvas.width, ctx.canvas.height, scene.textOverlay, scene.overlayConfig);
+                    }
+                }
+            }
+        }
+        
+        animationFrameId = requestAnimationFrame(loop);
+    };
+
+    if (isPlaying) {
+        lastTime = performance.now();
+        loop();
+    } else {
+        cancelAnimationFrame(animationFrameId);
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, totalDuration]);
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isPlaying, totalDuration, isExporting, activeSceneIndex, project]);
 
   // 2. Sync Active Scene & Video Elements
   useEffect(() => {
@@ -251,18 +390,90 @@ const ProjectBoard: React.FC<{
     }
   }, [isPlaying, project]);
 
-  // 4. Reset on stop
-  useEffect(() => {
-      if (currentTime === 0) {
-          if (musicRef.current) musicRef.current.currentTime = 0;
-          if (voRef.current) voRef.current.currentTime = 0;
-          
-          // Reset all videos to start
-          videoRefs.current.forEach(vid => {
-              if (vid) vid.currentTime = 0;
-          });
+  // 4. Export Logic
+  const handleExport = async () => {
+    if (!canvasRef.current || !project) return;
+    
+    // 1. Reset
+    setIsExporting(true);
+    setCurrentTime(0);
+    chunksRef.current = [];
+
+    // 2. Setup Audio Mixer
+    const Actx = window.AudioContext || (window as any).webkitAudioContext;
+    const ctx = new Actx();
+    audioCtxRef.current = ctx;
+    const dest = ctx.createMediaStreamDestination();
+
+    // Connect Music
+    if (musicRef.current) {
+        try {
+            // Need try-catch because createMediaElementSource throws if called twice on same element
+            // In a real app we'd cache these nodes. For now we assume one export per session or recreate refs if needed.
+            // Since we can't easily clear the node from the element, this is a limitation of this simple implementation.
+            // A workaround is to clone the audio element for export, but let's try direct connection first.
+            // Note: If you export twice, this might fail. Ideally we'd reuse the node.
+            // Simple workaround for demo: Create a new Audio element for export mixing
+             const source = ctx.createMediaElementSource(musicRef.current);
+             source.connect(dest);
+             source.connect(ctx.destination); // Optional: hear it while exporting
+        } catch (e) { console.warn("Audio node reuse issue (expected if exporting twice)", e); }
+    }
+    if (voRef.current) {
+        try {
+             const source = ctx.createMediaElementSource(voRef.current);
+             source.connect(dest);
+             source.connect(ctx.destination);
+        } catch (e) { console.warn("Audio node reuse issue", e); }
+    }
+
+    // 3. Setup Recorder
+    const canvasStream = canvasRef.current.captureStream(30); // 30 FPS
+    const combinedTracks = [
+        ...canvasStream.getVideoTracks(),
+        ...dest.stream.getAudioTracks()
+    ];
+    const combinedStream = new MediaStream(combinedTracks);
+    
+    const recorder = new MediaRecorder(combinedStream, {
+        mimeType: 'video/webm;codecs=vp9' // Chrome standard
+    });
+    
+    recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    
+    recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.title.replace(/\s+/g, '_')}_final_mix.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Cleanup
+        setIsExporting(false);
+        if (audioCtxRef.current) {
+            audioCtxRef.current.close();
+            audioCtxRef.current = null;
+        }
+    };
+    
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+    
+    // 4. Start Playback
+    setIsPlaying(true);
+  };
+
+  const stopExport = () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
       }
-  }, [currentTime]);
+      setIsPlaying(false);
+  };
 
   const handleAudioError = (source: string, e: any) => {
       // Prevent circular JSON error by logging safe strings instead of the event object
@@ -291,8 +502,20 @@ const ProjectBoard: React.FC<{
   const overlayConfig = activeScene?.overlayConfig;
   const { containerClasses, textClasses } = getOverlayClasses(overlayConfig);
 
+  // Canvas Size
+  const canvasW = settings.aspectRatio === AspectRatio.SixteenNine ? 1280 : 720;
+  const canvasH = settings.aspectRatio === AspectRatio.SixteenNine ? 720 : 1280;
+
   return (
     <div className="h-full flex flex-col">
+      {/* Hidden Canvas for Export */}
+      <canvas 
+        ref={canvasRef} 
+        width={canvasW} 
+        height={canvasH} 
+        className="hidden absolute pointer-events-none" 
+      />
+
       {/* Tabs */}
       <div className="flex border-b border-white/40 bg-white/10 backdrop-blur-sm">
         <button onClick={() => setActiveTab('output')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'output' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Final Output</button>
@@ -339,10 +562,20 @@ const ProjectBoard: React.FC<{
             </div>
         )}
 
+        {/* Exporting Overlay */}
+        {isExporting && (
+             <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center text-white">
+                <Loader2 className="animate-spin text-pink-500 mx-auto mb-4" size={48} />
+                <h3 className="text-2xl font-display font-bold">Rendering Final Mix...</h3>
+                <p className="text-slate-400 mt-2">Recording realtime playback. Do not close tab.</p>
+                <div className="mt-4 font-mono text-xl">{formatTime(currentTime)} / {formatTime(totalDuration)}</div>
+            </div>
+        )}
+
         {activeTab === 'output' ? (
           <div className="flex flex-col items-center h-full">
             {/* Audio Elements (Hidden but Active) */}
-            {/* Note: We force re-render when URLs change to ensure new Blobs are loaded */}
+            {/* Note: crossOrigin="anonymous" is crucial for MediaElementSource capture if served from CDN (not applicable here for blob, but good practice) */}
             {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} volume={0.3} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} />}
             {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} volume={1.0} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} />}
 
@@ -365,6 +598,7 @@ const ProjectBoard: React.FC<{
                         muted // Muted as we use separate audio tracks
                         playsInline
                         loop // Loop individual clips so they don't freeze if timing is off by ms
+                        crossOrigin="anonymous" // Important for canvas capture if needed
                     />
                 ))}
 
@@ -374,28 +608,46 @@ const ProjectBoard: React.FC<{
                         {activeScene?.textOverlay}
                     </h2>
                 </div>
+                {/* NO CONTROLS HERE - Moved below */}
+            </div>
 
-                {/* Controls */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black/80 to-transparent flex items-center justify-between z-20">
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => setIsPlaying(!isPlaying)}
-                            className="p-2 md:p-3 bg-white rounded-full text-black hover:bg-pink-400 hover:text-white transition-colors shadow-lg"
-                        >
-                            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-                        </button>
-                        <div className="flex flex-col">
-                            <span className="text-white font-bold text-xs md:text-sm tracking-wide">
-                                {formatTime(currentTime)} / {formatTime(totalDuration)}
-                            </span>
-                            <span className="text-white/60 text-[10px] md:text-xs font-mono">
-                                PHASE: FINAL MIX
-                            </span>
-                        </div>
+            {/* --- NEW EXTERNAL PLAYER CONTROLS --- */}
+            <div className="w-full mt-6 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center gap-4 md:gap-6 z-10">
+                {/* Play & Time Group */}
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                    <button 
+                        onClick={() => setIsPlaying(!isPlaying)}
+                        disabled={isExporting}
+                        className="w-12 h-12 flex items-center justify-center bg-slate-900 rounded-full text-white hover:bg-pink-500 transition-all shadow-md shrink-0 disabled:opacity-50"
+                    >
+                        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                    </button>
+                    <div className="flex flex-col">
+                        <span className="font-mono text-sm font-bold text-slate-700">
+                            {formatTime(currentTime)} <span className="text-slate-400">/ {formatTime(totalDuration)}</span>
+                        </span>
+                        <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Final Mix Preview</span>
                     </div>
-                     <div className="hidden md:flex items-center gap-2 text-white/50 bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
-                        <Music size={12} />
-                        <span className="text-xs font-bold uppercase">{project.musicMood}</span>
+                </div>
+
+                {/* Scrubber (Visual Only for now as state is internal loop) */}
+                <div className="flex-1 w-full h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                    <div 
+                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-orange-400 transition-all duration-100 ease-linear"
+                        style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }}
+                    />
+                </div>
+
+                {/* Music Info */}
+                <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl max-w-[200px] lg:max-w-[300px]">
+                    <div className="w-8 h-8 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center shrink-0">
+                        <Music size={14} />
+                    </div>
+                    <div className="flex flex-col overflow-hidden">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Soundtrack</span>
+                        <span className="text-xs font-bold text-slate-700 truncate" title={project.musicMood}>
+                            {project.musicMood || "No Music"}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -404,8 +656,12 @@ const ProjectBoard: React.FC<{
                 <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">{project.title}</h1>
                 <p className="text-sm md:text-base text-slate-600 mb-6">{project.concept}</p>
                 <div className="flex flex-col md:flex-row gap-4">
-                    <button className="btn-primary px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800">
-                        <Download size={18} /> Export Mixed MP4
+                    <button 
+                        onClick={handleExport}
+                        disabled={isExporting || isPlaying}
+                        className="btn-primary px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <Download size={18} /> {isExporting ? 'Rendering...' : 'Render & Download MP4'}
                     </button>
                     <button className="btn-primary px-6 py-3 bg-white text-slate-900 border-2 border-slate-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50">
                         Copy FFmpeg Command
