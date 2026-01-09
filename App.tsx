@@ -408,12 +408,6 @@ const ProjectBoard: React.FC<{
     // Connect Music
     if (musicRef.current) {
         try {
-            // Need try-catch because createMediaElementSource throws if called twice on same element
-            // In a real app we'd cache these nodes. For now we assume one export per session or recreate refs if needed.
-            // Since we can't easily clear the node from the element, this is a limitation of this simple implementation.
-            // A workaround is to clone the audio element for export, but let's try direct connection first.
-            // Note: If you export twice, this might fail. Ideally we'd reuse the node.
-            // Simple workaround for demo: Create a new Audio element for export mixing
              const source = ctx.createMediaElementSource(musicRef.current);
              source.connect(dest);
              source.connect(ctx.destination); // Optional: hear it while exporting
@@ -427,7 +421,7 @@ const ProjectBoard: React.FC<{
         } catch (e) { console.warn("Audio node reuse issue", e); }
     }
 
-    // 3. Setup Recorder
+    // 3. Setup Recorder with MP4 Preference
     const canvasStream = canvasRef.current.captureStream(30); // 30 FPS
     const combinedTracks = [
         ...canvasStream.getVideoTracks(),
@@ -435,20 +429,31 @@ const ProjectBoard: React.FC<{
     ];
     const combinedStream = new MediaStream(combinedTracks);
     
-    const recorder = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm;codecs=vp9' // Chrome standard
-    });
+    // Check for MP4 support
+    let mimeType = 'video/webm;codecs=vp9'; // Default Fallback
+    if (MediaRecorder.isTypeSupported('video/mp4')) {
+        mimeType = 'video/mp4';
+    } else if (MediaRecorder.isTypeSupported('video/webm')) {
+         mimeType = 'video/webm';
+    }
+
+    const recorder = new MediaRecorder(combinedStream, { mimeType });
     
     recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     
     recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${project.title.replace(/\s+/g, '_')}_final_mix.webm`;
+        
+        // Determine extension
+        const isMp4 = mimeType.includes('mp4');
+        const extension = isMp4 ? 'mp4' : 'webm';
+        
+        a.download = `${project.title.replace(/\s+/g, '_')}_final_mix.${extension}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -612,66 +617,50 @@ const ProjectBoard: React.FC<{
             </div>
 
             {/* --- NEW EXTERNAL PLAYER CONTROLS --- */}
-            <div className="w-full mt-6 bg-white border border-slate-200 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center gap-4 md:gap-6 z-10">
+            <div className="w-full mt-4 bg-white border border-slate-200 rounded-2xl p-3 md:p-4 shadow-xl flex flex-col md:flex-row items-center gap-4 z-10 max-w-4xl">
                 {/* Play & Time Group */}
                 <div className="flex items-center gap-4 w-full md:w-auto">
                     <button 
                         onClick={() => setIsPlaying(!isPlaying)}
                         disabled={isExporting}
-                        className="w-12 h-12 flex items-center justify-center bg-slate-900 rounded-full text-white hover:bg-pink-500 transition-all shadow-md shrink-0 disabled:opacity-50"
+                        className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-slate-900 rounded-full text-white hover:bg-pink-500 transition-all shadow-md shrink-0 disabled:opacity-50"
                     >
-                        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-1" />}
+                        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
                     </button>
                     <div className="flex flex-col">
                         <span className="font-mono text-sm font-bold text-slate-700">
                             {formatTime(currentTime)} <span className="text-slate-400">/ {formatTime(totalDuration)}</span>
                         </span>
-                        <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Final Mix Preview</span>
+                        <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Preview</span>
                     </div>
                 </div>
 
-                {/* Scrubber (Visual Only for now as state is internal loop) */}
-                <div className="flex-1 w-full h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                {/* Scrubber */}
+                <div className="flex-1 w-full h-2 bg-slate-100 rounded-full overflow-hidden relative group cursor-pointer">
+                    <div 
+                        className="absolute top-0 left-0 h-full bg-slate-200 w-full"
+                    />
                     <div 
                         className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-orange-400 transition-all duration-100 ease-linear"
                         style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }}
                     />
                 </div>
 
-                {/* Music Info */}
-                <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl max-w-[200px] lg:max-w-[300px]">
-                    <div className="w-8 h-8 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center shrink-0">
-                        <Music size={14} />
-                    </div>
-                    <div className="flex flex-col overflow-hidden">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Soundtrack</span>
-                        <span className="text-xs font-bold text-slate-700 truncate" title={project.musicMood}>
-                            {project.musicMood || "No Music"}
-                        </span>
-                    </div>
-                </div>
+                {/* Download Button (Moved here) */}
+                <button 
+                    onClick={handleExport}
+                    disabled={isExporting || isPlaying}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    title="Render & Download"
+                >
+                     {isExporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                     <span>{isExporting ? 'Rendering...' : 'Download'}</span>
+                </button>
             </div>
 
-            <div className="mt-8 w-full max-w-2xl">
+            <div className="mt-6 w-full max-w-2xl text-center">
                 <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">{project.title}</h1>
-                <p className="text-sm md:text-base text-slate-600 mb-6">{project.concept}</p>
-                <div className="flex flex-col md:flex-row gap-4">
-                    <button 
-                        onClick={handleExport}
-                        disabled={isExporting || isPlaying}
-                        className="btn-primary px-6 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Download size={18} /> {isExporting ? 'Rendering...' : 'Render & Download MP4'}
-                    </button>
-                    <button className="btn-primary px-6 py-3 bg-white text-slate-900 border-2 border-slate-900 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50">
-                        Copy FFmpeg Command
-                    </button>
-                </div>
-                {project.ffmpegCommand && (
-                    <div className="mt-6 p-4 bg-slate-900 rounded-lg overflow-x-auto">
-                        <code className="text-xs text-green-400 font-mono whitespace-pre">{project.ffmpegCommand}</code>
-                    </div>
-                )}
+                <p className="text-sm text-slate-600 max-w-lg mx-auto">{project.concept}</p>
             </div>
           </div>
         ) : (
@@ -773,7 +762,7 @@ const AgentChat: React.FC<{
           </div>
           <div className="p-3 bg-white border-t border-slate-100">
             <div className="flex gap-2">
-                <input type="text" className="flex-1 bg-slate-100 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500" placeholder="Type request..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} />
+                <input type="text" className="flex-1 bg-slate-100 text-slate-900 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500" placeholder="Type request..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} />
                 <button onClick={handleSend} className="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800"><ArrowUpCircle size={20} /></button>
             </div>
           </div>
