@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
-import { AspectRatio, ProjectSettings, ReferenceFile, TTSVoice, AdProject, DialogueLine, ChatAttachment } from "../types";
+import { AspectRatio, ProjectSettings, ReferenceFile, TTSVoice, AdProject, DialogueLine, ChatAttachment, Scene } from "../types";
 
 // --- AUDIO UTILITIES (PCM to WAV) ---
 
@@ -97,15 +97,16 @@ const adPlanSchema: Schema = {
     title: { type: Type.STRING },
     concept: { type: Type.STRING },
     musicMood: { type: Type.STRING },
-    fullScript: { type: Type.STRING, description: "A cohesive, timing-aware voiceover script or summary of the dialogue." },
+    characterProfile: { type: Type.STRING, description: "Detailed physical description of the main character to be used as a fallback." },
+    visualStyleProfile: { type: Type.STRING, description: "Detailed world description." },
+    fullScript: { type: Type.STRING },
     script: {
         type: Type.ARRAY,
-        description: "Phase 3: Narrative Dialogue structure. Use this if the ad involves characters talking.",
         items: {
             type: Type.OBJECT,
             properties: {
-                speaker: { type: Type.STRING, description: "Name of the character (e.g. 'Narrator', 'Hero', 'Alien')" },
-                text: { type: Type.STRING, description: "The spoken line." }
+                speaker: { type: Type.STRING },
+                text: { type: Type.STRING }
             }
         }
     },
@@ -116,33 +117,66 @@ const adPlanSchema: Schema = {
         properties: {
           id: { type: Type.STRING },
           order: { type: Type.INTEGER },
-          duration: { type: Type.INTEGER, description: "4 or 6" },
-          visualPrompt: { type: Type.STRING, description: "Detailed visual description for Veo. Describe lighting, camera angle, and subject detail." },
-          textOverlay: { type: Type.STRING, description: "Optional short text overlay." },
+          duration: { type: Type.INTEGER },
+          // NEW RICH STRUCTURE
+          character: {
+              type: Type.OBJECT,
+              properties: {
+                  name: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  hair: { type: Type.STRING },
+                  face: { type: Type.STRING },
+                  wardrobe: { type: Type.STRING }
+              },
+              required: ["description", "wardrobe"]
+          },
+          environment: {
+              type: Type.OBJECT,
+              properties: {
+                  location: { type: Type.STRING },
+                  look: { type: Type.STRING },
+                  lighting: { type: Type.STRING },
+                  background_motion: { type: Type.STRING }
+              },
+              required: ["location", "look", "lighting"]
+          },
+          camera: {
+              type: Type.OBJECT,
+              properties: {
+                  framing: { type: Type.STRING },
+                  movement: { type: Type.STRING },
+                  notes: { type: Type.STRING }
+              },
+              required: ["framing", "movement"]
+          },
+          action_blocking: {
+              type: Type.ARRAY,
+              items: {
+                  type: Type.OBJECT,
+                  properties: {
+                      time_window: { type: Type.STRING },
+                      notes: { type: Type.STRING }
+                  }
+              }
+          },
+          visual_summary_prompt: { type: Type.STRING },
+          
+          textOverlay: { type: Type.STRING },
           overlayConfig: {
             type: Type.OBJECT,
-            description: "Configuration for the text overlay placement and size.",
             properties: {
-              position: { 
-                type: Type.STRING, 
-                enum: ['center', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
-                description: "Where to place the text based on the visual composition (negative space)."
-              },
-              size: { 
-                type: Type.STRING, 
-                enum: ['small', 'medium', 'large', 'xl'],
-                description: "Font size. Use XL only for 1-2 words. Use Small/Medium for longer sentences."
-              }
+              position: { type: Type.STRING, enum: ['center', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right'] },
+              size: { type: Type.STRING, enum: ['small', 'medium', 'large', 'xl'] }
             },
             required: ["position", "size"]
           }
         },
-        required: ["id", "order", "duration", "visualPrompt", "overlayConfig"]
+        required: ["id", "order", "duration", "character", "environment", "camera", "visual_summary_prompt", "action_blocking"]
       }
     },
     ffmpegCommand: { type: Type.STRING }
   },
-  required: ["title", "concept", "scenes", "musicMood", "fullScript", "ffmpegCommand"]
+  required: ["title", "concept", "scenes", "musicMood", "fullScript"]
 };
 
 export const generateAdPlan = async (
@@ -153,58 +187,30 @@ export const generateAdPlan = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = "gemini-3-pro-preview";
   
-  // Phase 3.5: Multimodal Prompt Construction
   const contentParts: any[] = [];
   
   let textContext = "REFERENCE MATERIALS:\n";
   let hasLinks = false;
 
-  // Process references: Images become InlineData parts, text is aggregated
   for (const file of referenceFiles) {
       if (file.type === 'image' || file.type === 'pdf') {
-          // Try to extract pure base64
           const base64 = file.content.includes(',') ? file.content.split(',')[1] : file.content;
           const mimeType = file.mimeType || (file.type === 'image' ? 'image/png' : 'application/pdf');
-          
-          contentParts.push({
-              inlineData: {
-                  mimeType: mimeType,
-                  data: base64
-              }
-          });
+          contentParts.push({ inlineData: { mimeType: mimeType, data: base64 } });
       } else if (file.type === 'link') {
           hasLinks = true;
-          textContext += `- YouTube/Web Link: ${file.content} (Please use Google Search to analyze the style, content, and vibe of this link)\n`;
+          textContext += `- YouTube/Web Link: ${file.content}\n`;
       } else {
           textContext += `- File: ${file.name}: ${file.content.substring(0, 500)}...\n`;
       }
-  }
-
-  // Phase 2: Mode specific instructions
-  let modeInstructions = "";
-  switch (settings.mode) {
-    case "Music Video":
-        modeInstructions = "MODE: MUSIC VIDEO. Ignore standard commercial timing rules. Focus on visual loops, abstract imagery, beat synchronization, and artistic flair. The visual prompts should be rhythmic and dynamic.";
-        break;
-    case "Trippy":
-        modeInstructions = "MODE: TRIPPY / PSYCHEDELIC. Automatically inject style modifiers like 'fractal, neon, surrealism, dreamcore, kaleidoscope' into EVERY visualPrompt. Make the visuals mind-bending.";
-        break;
-    case "Cinematic":
-        modeInstructions = "MODE: CINEMATIC. Focus on '8k, anamorphic lens, dramatic lighting, depth of field, blockbuster movie feel'.";
-        break;
-    case "Commercial":
-    default:
-        modeInstructions = "MODE: COMMERCIAL. Standard broadcast quality. Clear, concise, product-focused.";
-        break;
   }
 
   const settingsContext = `
     SETTINGS:
     - Mode: ${settings.mode}
     - Aspect Ratio: ${settings.aspectRatio}
-    - Voice Preference: ${settings.preferredVoice}
     - Text Overlays: ${settings.useTextOverlays}
-    - Custom Script provided: ${settings.customScript ? "Yes" : "No"}
+    - Custom Script: ${settings.customScript}
     - Music Theme: ${settings.musicTheme}
   `;
 
@@ -212,39 +218,31 @@ export const generateAdPlan = async (
     ${textContext}
     ${settingsContext}
     USER REQUEST: "${prompt}"
-    ${settings.customScript ? `USER SCRIPT: "${settings.customScript}"` : ""}
-    
-    ${modeInstructions}
 
-    TASK: Generate a precise 30-second Video Ad Plan.
+    TASK: Generate a 30-second Video Ad Plan using the "Director's JSON" structure.
+    
+    INSTRUCTIONS:
+    1. **Detailed Breakdowns**: For EVERY scene, you must generate specific details for Camera (Framing/Movement), Character (Wardrobe/Hair), and Environment (Lighting/Look).
+    2. **Consistency**: The 'character.description' and 'environment.look' should be somewhat consistent across scenes unless the location changes.
+    3. **Action Blocking**: Use the 'action_blocking' array to describe exactly what happens in the 4-6 second clip.
+    4. **Visual Summary**: Also provide a 'visual_summary_prompt' which is a single cohesive paragraph summarizing the scene for a text-to-video model.
     
     CONSTRAINTS:
-    1. Total Duration must be exactly 30 seconds.
-    2. Scenes must be 4s or 6s. (e.g., 5 scenes of 6s, or mix).
-    3. The 'fullScript' (or 'script' array) must be timed perfectly for a 30s read. Aim for exactly 60-75 words.
-    
-    PHASE 3 NARRATIVE UPDATE:
-    - If the user request implies a conversation or distinct characters, populate the 'script' array with { speaker, text } objects.
-    - If it's a standard voiceover, use the 'script' array with a single speaker 'Narrator'.
-    
-    DESIGN DIRECTIVE (Text Overlays):
-    - Analyze your own 'visualPrompt' AND any attached reference images to find negative space.
-    - Example: If the video or reference shows a subject on the right, place text 'center-left'.
+    - Duration: Exactly 30s.
+    - Scenes: 4s or 6s each.
+    - Script: 60-70 words.
   `;
 
-  // Add the main text prompt as the last part
   contentParts.push({ text: fullPromptText });
 
   try {
     const requestConfig: any = {
-      systemInstruction: "You are a world-class AI Creative Director. You understand video editing timing and visual composition perfectly.",
+      systemInstruction: "You are an elite Film Director. You break down scenes into granular technical components (Lighting, Wardrobe, Camera, Blocking) to ensure perfect production consistency.",
       responseMimeType: "application/json",
       responseSchema: adPlanSchema,
     };
 
-    // Enable Google Search if links are present
     if (hasLinks) {
-        console.log("Links detected, enabling Google Search tool...");
         requestConfig.tools = [{ googleSearch: {} }];
     }
 
@@ -260,57 +258,63 @@ export const generateAdPlan = async (
   }
 };
 
-// --- 2. Storyboard Generation (NEW: Image Consistency Layer) ---
+// --- 2. Storyboard Generation (UPDATED: Uses Rich Scene Data) ---
 
 export const generateStoryboardImage = async (
-    visualPrompt: string,
+    scene: Scene,
     aspectRatio: AspectRatio,
-    visualAnchorDataUrl?: string
+    visualAnchorDataUrl?: string,
 ): Promise<string | null> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
     
-    console.log(`[Storyboard] Generating image for: "${visualPrompt.substring(0, 30)}..."`);
-    
     const parts: any[] = [];
     
-    // Inject Visual Anchor if available for CONSISTENCY
+    // 1. Inject Visual Anchor
     if (visualAnchorDataUrl) {
         const parsed = parseDataUrl(visualAnchorDataUrl);
         if (parsed) {
             parts.push({
-                inlineData: {
-                    mimeType: parsed.mimeType,
-                    data: parsed.base64
-                }
+                inlineData: { mimeType: parsed.mimeType, data: parsed.base64 }
             });
-            // Strong instruction to strictly follow the image
-            parts.push({ text: "INSTRUCTION: The image above is a STRICT character/style reference. Generate a new scene featuring this exact character/style." });
+            parts.push({ text: "REFERENCE IMAGE: Use the subject from this image. Keep their face and body consistent." });
         }
     }
 
-    parts.push({ text: `Generate a high-quality, photorealistic cinematic shot. Scene Description: ${visualPrompt}` });
+    // 2. Construct the Director's Prompt (The Sandwich)
+    const prompt = `
+      Create a photorealistic cinematic shot.
+      
+      [CAMERA]: ${scene.camera.framing}, ${scene.camera.movement}. ${scene.camera.notes}
+      
+      [LIGHTING & ATMOSPHERE]: ${scene.environment.lighting}, ${scene.environment.look}.
+      
+      [LOCATION]: ${scene.environment.location}.
+      
+      [SUBJECT]: ${scene.character.description}. 
+      - Hair: ${scene.character.hair}
+      - Wardrobe: ${scene.character.wardrobe}
+      - Face: ${scene.character.face}
+      
+      [ACTION]: ${scene.action_blocking.map(a => a.notes).join('. ')}
+      
+      [STYLE]: High-end commercial, 8k resolution, highly detailed.
+    `;
+    
+    parts.push({ text: prompt });
 
     try {
-        // We use gemini-3-pro-image-preview for high fidelity instruction following
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-image-preview',
             contents: { parts },
             config: {
-                imageConfig: {
-                    aspectRatio: aspect,
-                    imageSize: "1K"
-                }
+                imageConfig: { aspectRatio: aspect, imageSize: "1K" }
             }
         });
 
-        // Extract image
         for (const part of response.candidates[0].content.parts) {
             if (part.inlineData) {
-                const base64 = part.inlineData.data;
-                const mimeType = part.inlineData.mimeType || 'image/png';
-                // Return as Data URL
-                return `data:${mimeType};base64,${base64}`;
+                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
             }
         }
         return null;
@@ -320,68 +324,69 @@ export const generateStoryboardImage = async (
     }
 };
 
-// --- 3. Veo 3.1 Video Generation (UPDATED: Supports Image Input) ---
+// --- 3. Veo 3.1 Video Generation ---
+
+const internalGenerateVideo = async (
+    ai: GoogleGenAI,
+    prompt: string,
+    aspect: string,
+    imageInput?: { base64: string, mimeType: string }
+): Promise<string | null> => {
+    try {
+        let requestPayload: any = {
+            model: 'veo-3.1-fast-generate-preview',
+            prompt: prompt, 
+            config: { numberOfVideos: 1, resolution: '720p', aspectRatio: aspect }
+        };
+
+        if (imageInput) {
+            requestPayload.image = { imageBytes: imageInput.base64, mimeType: imageInput.mimeType };
+        }
+
+        let operation = await ai.models.generateVideos(requestPayload);
+        while (!operation.done) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            operation = await ai.operations.getVideosOperation({ operation: operation });
+        }
+
+        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (!videoUri) return null;
+
+        const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
+    } catch (error) {
+        return null;
+    }
+}
 
 export const generateVideoClip = async (
-  visualPrompt: string, 
+  scene: Scene,
   aspectRatio: AspectRatio,
-  sourceImageDataUrl?: string // Now accepts the Storyboard Image as input
+  sourceImageDataUrl?: string
 ): Promise<string | null> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
     
-    console.log(`[Veo] Starting generation. Input Image Present: ${!!sourceImageDataUrl}`);
+    // Construct a rich prompt for Veo as well, even if using image input
+    const veoPrompt = `
+      Cinematic video.
+      ${scene.action_blocking.map(a => a.notes).join('. ')}
+      Camera: ${scene.camera.movement}.
+      Lighting: ${scene.environment.lighting}.
+    `;
 
-    try {
-        let requestPayload: any = {
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: visualPrompt, // Still provide prompt for motion guidance
-            config: {
-                numberOfVideos: 1,
-                resolution: '720p',
-                aspectRatio: aspect
-            }
-        };
-
-        // IMAGE-TO-VIDEO: This locks consistency
-        if (sourceImageDataUrl) {
-            const parsed = parseDataUrl(sourceImageDataUrl);
-            if (parsed) {
-                console.log(`[Veo] Using Storyboard Image for Image-to-Video generation`);
-                requestPayload.image = {
-                    imageBytes: parsed.base64,
-                    mimeType: parsed.mimeType
-                };
-            }
+    // ATTEMPT 1: Image-to-Video
+    if (sourceImageDataUrl) {
+        const parsed = parseDataUrl(sourceImageDataUrl);
+        if (parsed) {
+            const videoUrl = await internalGenerateVideo(ai, veoPrompt, aspect, parsed);
+            if (videoUrl) return videoUrl;
         }
-
-        let operation = await ai.models.generateVideos(requestPayload);
-
-        console.log(`[Veo] Operation started. Name: ${operation.name}`);
-
-        while (!operation.done) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            operation = await ai.operations.getVideosOperation({ operation: operation });
-            console.log(`[Veo] Polling... Done: ${operation.done}`);
-        }
-
-        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
-        if (!videoUri) {
-            console.error("[Veo] No video URI in response", operation);
-            return null;
-        }
-
-        const response = await fetch(`${videoUri}&key=${process.env.API_KEY}`);
-        if (!response.ok) throw new Error(`Video fetch failed: ${response.status}`);
-        
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        return objectUrl;
-
-    } catch (error) {
-        console.error("[Veo] Generation Error:", error);
-        return null;
     }
+
+    // ATTEMPT 2: Text-to-Video (Fallback using the visual summary)
+    return await internalGenerateVideo(ai, scene.visual_summary_prompt + " (Cinematic, Photorealistic)", aspect, undefined);
 };
 
 // --- 4. TTS Generation (PCM to WAV) ---
@@ -421,7 +426,6 @@ export const generateVoiceover = async (text: string, voice: TTSVoice, dialogue?
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    
     if (base64Audio) {
         const pcmData = base64ToUint8Array(base64Audio);
         const wavBlob = pcmToWavBlob(pcmData, 24000, 1);
@@ -434,8 +438,7 @@ export const generateVoiceover = async (text: string, voice: TTSVoice, dialogue?
   }
 };
 
-// --- 5. Music Generation (Real Lyria with Fallback) ---
-// ... (Keeping existing music generation code as is, omitted for brevity but assumed present)
+// --- 5. Music Generation ---
 const MOOD_TRACKS: Record<string, string> = {
     'upbeat': 'https://cdn.pixabay.com/download/audio/2024/05/20/audio_34b92569de.mp3?filename=uplifting-background-music-for-videos-corporates-presentations-205562.mp3',
     'cinematic': 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_5119a9705a.mp3?filename=cinematic-atmosphere-score-2-21142.mp3',
@@ -465,7 +468,6 @@ export const generateMusic = async (moodDescription: string, durationSeconds: nu
         try {
             const lyriaClient = new GoogleGenAI({ apiKey: process.env.API_KEY, apiVersion: 'v1alpha' });
             const SAMPLE_RATE = 48000;
-            const CHANNELS = 2;
             const chunks: Uint8Array[] = [];
             // @ts-ignore
             const session = await lyriaClient.live.music.connect({
@@ -491,7 +493,7 @@ export const generateMusic = async (moodDescription: string, durationSeconds: nu
                 const combinedPcm = new Uint8Array(totalLength);
                 let offset = 0;
                 for (const chunk of chunks) { combinedPcm.set(chunk, offset); offset += chunk.length; }
-                const wavBlob = pcmToWavBlob(combinedPcm, SAMPLE_RATE, CHANNELS);
+                const wavBlob = pcmToWavBlob(combinedPcm, SAMPLE_RATE, 2);
                 hasResolved = true; clearTimeout(safetyTimeout); resolve(URL.createObjectURL(wavBlob));
             }, durationSeconds * 1000);
         } catch (e) { if (!hasResolved) { hasResolved = true; clearTimeout(safetyTimeout); resolve(triggerFallback(`Exception: ${e}`)); } }
@@ -506,86 +508,27 @@ export const sendChatMessage = async (
     attachments?: ChatAttachment[]
 ) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Prepare the message parts
     let parts: any[] = [];
     let hasLinks = false;
 
-    // Phase 3.5: Add Attachments first (so model sees them)
     if (attachments && attachments.length > 0) {
-        console.log(`[Chat] Sending ${attachments.length} attachments.`);
         attachments.forEach(att => {
             if (att.type === 'link') {
                 hasLinks = true;
                 parts.push({ text: `[REFERENCE LINK]: ${att.url} (Use Google Search to analyze this link)` });
             } else {
                 parts.push({
-                    inlineData: {
-                        mimeType: att.mimeType,
-                        data: att.base64Data
-                    }
+                    inlineData: { mimeType: att.mimeType, data: att.base64Data }
                 });
             }
         });
     }
 
-    // Add User Text
     parts.push({ text: message });
-
-    // Prepare system instructions with enhanced context if project exists
-    let systemInstruction = "You are a helpful AI Creative Director. You are an expert in video production, editing, and storytelling.";
+    let systemInstruction = "You are a helpful AI Creative Director.";
     
-    if (project) {
-        systemInstruction += `\n\nCURRENT PROJECT CONTEXT:
-        Title: "${project.title}"
-        Concept: "${project.concept}"
-        Mode: "${project.mode || 'Commercial'}"
-        
-        When asked to critique or review, analyze the attached video clips or images for consistency, lighting, composition, and relevance to the script.
-        `;
-
-        // Attach video context if scenes are complete
-        if (project.scenes && project.scenes.length > 0) {
-            try {
-                // Now we can attach storyboards OR videos for context
-                const completedScenes = project.scenes.filter(s => s.status === 'complete' && (s.videoUrl || s.storyboardUrl));
-                
-                if (completedScenes.length > 0) {
-                    const sceneParts = await Promise.all(
-                        completedScenes.map(async (s) => {
-                            // Prefer video, fallback to storyboard
-                            const url = s.videoUrl || s.storyboardUrl;
-                            const mime = s.videoUrl ? 'video/mp4' : 'image/png';
-                            if (!url) return null;
-                            const base64 = await urlToBase64(url);
-                            return {
-                                inlineData: {
-                                    mimeType: mime,
-                                    data: base64
-                                }
-                            };
-                        })
-                    );
-                    
-                    const validParts = sceneParts.filter(p => p !== null);
-                    if (validParts.length > 0) {
-                        parts = [...validParts, ...parts];
-                        parts.push({ text: `\n\n[SYSTEM NOTE]: The user has attached ${validParts.length} scenes (videos or storyboards) from the current project for context.`});
-                    }
-                }
-            } catch (e) {
-                console.warn("Failed to attach video context to chat", e);
-            }
-        }
-    }
-
-    const config: any = { 
-        systemInstruction: systemInstruction 
-    };
-
-    if (hasLinks) {
-        config.tools = [{googleSearch: {}}];
-    }
+    const config: any = { systemInstruction: systemInstruction };
+    if (hasLinks) config.tools = [{googleSearch: {}}];
 
     const chat = ai.chats.create({
         model: 'gemini-3-pro-preview', 
@@ -593,9 +536,6 @@ export const sendChatMessage = async (
         config: config
     });
     
-    const result = await chat.sendMessage({ 
-        message: parts
-    });
-    
+    const result = await chat.sendMessage({ message: parts });
     return result.text;
 }

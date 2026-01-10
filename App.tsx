@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig, ProjectMode, ChatAttachment } from './types';
+import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig, ProjectMode, ChatAttachment, Scene } from './types';
 import * as GeminiService from './services/geminiService';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye, Sparkles, Paperclip, FileImage, FileVideo, Link as LinkIcon, Youtube, Image as ImageIcon } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye, Sparkles, Paperclip, FileImage, FileVideo, Link as LinkIcon, Youtube, Image as ImageIcon, VenetianMask, Palette, Video, Camera, Shirt, Sun, ChevronDown, ChevronUp } from 'lucide-react';
 
-// ... (ReferenceManager, SettingsPanel, Helpers remain unchanged) ...
 // --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
   files: ReferenceFile[];
@@ -22,7 +21,6 @@ const ReferenceManager: React.FC<{
       const reader = new FileReader();
       reader.onload = (event) => {
         const result = event.target?.result as string;
-        // Basic MimeType detection from Data URL
         const mimeType = result.match(/^data:(.+);base64/)?.[1];
         
         const newFile: ReferenceFile = {
@@ -31,7 +29,7 @@ const ReferenceManager: React.FC<{
           type: file.type.includes('image') ? 'image' : file.type.includes('pdf') ? 'pdf' : 'text',
           content: result, 
           previewUrl: file.type.includes('image') ? URL.createObjectURL(file) : undefined,
-          mimeType: mimeType // Store mimeType for API
+          mimeType: mimeType 
         };
         if (isAnchor) {
             setVisualAnchor(newFile);
@@ -58,7 +56,6 @@ const ReferenceManager: React.FC<{
 
   return (
     <div className="h-full flex flex-col p-6 space-y-8">
-      
       {/* Visual Anchor Section */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
@@ -175,7 +172,6 @@ const ReferenceManager: React.FC<{
   );
 };
 
-// ... (SettingsPanel, getOverlayClasses, drawTextOverlayToCanvas remain same) ...
 const SettingsPanel: React.FC<{
   settings: ProjectSettings;
   setSettings: React.Dispatch<React.SetStateAction<ProjectSettings>>;
@@ -184,7 +180,7 @@ const SettingsPanel: React.FC<{
     <div className="h-full flex flex-col p-6 space-y-8 overflow-y-auto">
       <h2 className="text-2xl font-display font-bold text-slate-800">Studio Settings</h2>
       
-      {/* PHASE 2: Project Mode Selector */}
+      {/* Project Mode Selector */}
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Sparkles size={14} /> Project Mode</label>
         <div className="grid grid-cols-2 gap-2">
@@ -269,6 +265,7 @@ const getOverlayClasses = (config?: OverlayConfig) => {
     }
     return { containerClasses, textClasses };
 };
+
 const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number, textAlign: CanvasTextAlign) => {
     const words = text.split(' ');
     let line = '';
@@ -290,6 +287,7 @@ const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: num
         ctx.fillText(l.trim(), x, y + (i * lineHeight));
     });
 };
+
 const drawTextOverlayToCanvas = (ctx: CanvasRenderingContext2D, width: number, height: number, text: string, config?: OverlayConfig) => {
     if (!text) return;
     const pos = config?.position || 'center';
@@ -327,6 +325,7 @@ const drawTextOverlayToCanvas = (ctx: CanvasRenderingContext2D, width: number, h
     wrapText(ctx, text, x, y, maxWidth, lineHeight, align);
 };
 
+
 // --- Middle Panel: Advanced Sequencer Player ---
 const ProjectBoard: React.FC<{
   project: AdProject | null;
@@ -337,7 +336,6 @@ const ProjectBoard: React.FC<{
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   
-  // Master Sequencer State
   const [currentTime, setCurrentTime] = useState(0);
   const [activeSceneIndex, setActiveSceneIndex] = useState(0);
   
@@ -345,56 +343,41 @@ const ProjectBoard: React.FC<{
   const voRef = useRef<HTMLAudioElement>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   
-  // Export Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  // Calculate Total Duration
   const totalDuration = project ? project.scenes.reduce((acc, scene) => acc + scene.duration, 0) : 0;
 
-  // 1. Playback Loop (Replaced setInterval with requestAnimationFrame for smooth recording)
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
 
     const loop = () => {
         const now = performance.now();
-        // If exporting, we might want fixed time steps, but for now simple delta is fine
-        // provided the computer is fast enough.
         const dt = (now - lastTime) / 1000; 
         lastTime = now;
 
         if (isPlaying && totalDuration > 0) {
             setCurrentTime(prev => {
                 const next = prev + dt;
-                
-                // End of playback
                 if (next >= totalDuration) {
                     setIsPlaying(false);
-                    if (isExporting) {
-                        stopExport();
-                    }
-                    return 0; // Reset
+                    if (isExporting) stopExport();
+                    return 0; 
                 }
                 return next;
             });
 
-            // If Render Mode: Draw to hidden canvas
             if (isExporting && canvasRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
                 const vid = videoRefs.current[activeSceneIndex];
                 if (ctx && vid) {
-                    // Clear
                     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-                    // Draw Video
                     try {
                         ctx.drawImage(vid, 0, 0, ctx.canvas.width, ctx.canvas.height);
-                    } catch(e) {
-                        // Video might not be ready
-                    }
-                    // Draw Overlay
+                    } catch(e) {}
                     const scene = project?.scenes[activeSceneIndex];
                     if (scene?.textOverlay) {
                         drawTextOverlayToCanvas(ctx, ctx.canvas.width, ctx.canvas.height, scene.textOverlay, scene.overlayConfig);
@@ -402,7 +385,6 @@ const ProjectBoard: React.FC<{
                 }
             }
         }
-        
         animationFrameId = requestAnimationFrame(loop);
     };
 
@@ -416,11 +398,8 @@ const ProjectBoard: React.FC<{
     return () => cancelAnimationFrame(animationFrameId);
   }, [isPlaying, totalDuration, isExporting, activeSceneIndex, project]);
 
-  // 2. Sync Active Scene & Video Elements
   useEffect(() => {
     if (!project) return;
-    
-    // Determine which scene is active based on currentTime
     let accumulatedTime = 0;
     let newIndex = 0;
     for (let i = 0; i < project.scenes.length; i++) {
@@ -432,19 +411,13 @@ const ProjectBoard: React.FC<{
     }
     setActiveSceneIndex(newIndex);
 
-    // Sync Video Elements (Opacity Stack Method)
     videoRefs.current.forEach((vid, idx) => {
         if (!vid) return;
-        
-        // Ensure all videos are attempting to play so they are ready
-        // 'loop' is true on the element, so they won't stop
         if (isPlaying && vid.paused) {
              vid.play().catch(() => {});
         } else if (!isPlaying && !vid.paused) {
              vid.pause();
         }
-
-        // Switch visibility using Opacity and Z-Index
         if (idx === newIndex) {
             vid.style.opacity = '1';
             vid.style.zIndex = '10';
@@ -453,46 +426,35 @@ const ProjectBoard: React.FC<{
             vid.style.zIndex = '0';
         }
     });
-
   }, [currentTime, project, isPlaying]);
 
-  // 3. Audio Sync
   useEffect(() => {
     if (isPlaying) {
-        if (musicRef.current && project?.musicUrl) {
-            musicRef.current.play().catch(e => console.log('Music play blocked', e));
-        }
-        if (voRef.current && project?.voiceoverUrl) {
-            voRef.current.play().catch(e => console.log('VO play blocked', e));
-        }
+        if (musicRef.current && project?.musicUrl) musicRef.current.play().catch(e => console.log('Music play blocked', e));
+        if (voRef.current && project?.voiceoverUrl) voRef.current.play().catch(e => console.log('VO play blocked', e));
     } else {
         musicRef.current?.pause();
         voRef.current?.pause();
     }
   }, [isPlaying, project]);
 
-  // 4. Export Logic
   const handleExport = async () => {
     if (!canvasRef.current || !project) return;
-    
-    // 1. Reset
     setIsExporting(true);
     setCurrentTime(0);
     chunksRef.current = [];
 
-    // 2. Setup Audio Mixer
     const Actx = window.AudioContext || (window as any).webkitAudioContext;
     const ctx = new Actx();
     audioCtxRef.current = ctx;
     const dest = ctx.createMediaStreamDestination();
 
-    // Connect Music
     if (musicRef.current) {
         try {
              const source = ctx.createMediaElementSource(musicRef.current);
              source.connect(dest);
-             source.connect(ctx.destination); // Optional: hear it while exporting
-        } catch (e) { console.warn("Audio node reuse issue (expected if exporting twice)", e); }
+             source.connect(ctx.destination); 
+        } catch (e) { console.warn("Audio node reuse issue", e); }
     }
     if (voRef.current) {
         try {
@@ -502,69 +464,41 @@ const ProjectBoard: React.FC<{
         } catch (e) { console.warn("Audio node reuse issue", e); }
     }
 
-    // 3. Setup Recorder with MP4 Preference
-    const canvasStream = canvasRef.current.captureStream(30); // 30 FPS
-    const combinedTracks = [
-        ...canvasStream.getVideoTracks(),
-        ...dest.stream.getAudioTracks()
-    ];
+    const canvasStream = canvasRef.current.captureStream(30); 
+    const combinedTracks = [...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()];
     const combinedStream = new MediaStream(combinedTracks);
     
-    // Check for MP4 support
-    let mimeType = 'video/webm;codecs=vp9'; // Default Fallback
-    if (MediaRecorder.isTypeSupported('video/mp4')) {
-        mimeType = 'video/mp4';
-    } else if (MediaRecorder.isTypeSupported('video/webm')) {
-         mimeType = 'video/webm';
-    }
+    let mimeType = 'video/webm;codecs=vp9';
+    if (MediaRecorder.isTypeSupported('video/mp4')) mimeType = 'video/mp4';
+    else if (MediaRecorder.isTypeSupported('video/webm')) mimeType = 'video/webm';
 
     const recorder = new MediaRecorder(combinedStream, { mimeType });
-    
-    recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-    };
-    
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        
-        // Determine extension
-        const isMp4 = mimeType.includes('mp4');
-        const extension = isMp4 ? 'mp4' : 'webm';
-        
+        const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
         a.download = `${project.title.replace(/\s+/g, '_')}_final_mix.${extension}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        
-        // Cleanup
         setIsExporting(false);
-        if (audioCtxRef.current) {
-            audioCtxRef.current.close();
-            audioCtxRef.current = null;
-        }
+        if (audioCtxRef.current) { audioCtxRef.current.close(); audioCtxRef.current = null; }
     };
-    
     mediaRecorderRef.current = recorder;
     recorder.start();
-    
-    // 4. Start Playback
     setIsPlaying(true);
   };
 
   const stopExport = () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          mediaRecorderRef.current.stop();
-      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
       setIsPlaying(false);
   };
 
   const handleAudioError = (source: string, e: any) => {
-      // Prevent circular JSON error by logging safe strings instead of the event object
-      const errorMsg = e instanceof Error ? e.message : 'Unknown playback error';
-      console.error(`${source} Playback Error:`, errorMsg, e.target?.src || 'No src');
+      console.error(`${source} Playback Error:`, e.message, e.target?.src);
   };
 
   if (!project) {
@@ -587,73 +521,42 @@ const ProjectBoard: React.FC<{
   const activeScene = project.scenes[activeSceneIndex];
   const overlayConfig = activeScene?.overlayConfig;
   const { containerClasses, textClasses } = getOverlayClasses(overlayConfig);
-
-  // Canvas Size
   const canvasW = settings.aspectRatio === AspectRatio.SixteenNine ? 1280 : 720;
   const canvasH = settings.aspectRatio === AspectRatio.SixteenNine ? 720 : 1280;
 
   return (
     <div className="h-full flex flex-col">
-      {/* Hidden Canvas for Export */}
-      <canvas 
-        ref={canvasRef} 
-        width={canvasW} 
-        height={canvasH} 
-        className="hidden absolute pointer-events-none" 
-      />
+      <canvas ref={canvasRef} width={canvasW} height={canvasH} className="hidden absolute pointer-events-none" />
 
-      {/* Tabs */}
       <div className="flex border-b border-white/40 bg-white/10 backdrop-blur-sm">
         <button onClick={() => setActiveTab('output')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'output' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Final Output</button>
-        <button onClick={() => setActiveTab('ingredients')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'ingredients' ? 'text-teal-600 border-b-2 border-teal-500 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Ingredients</button>
+        <button onClick={() => setActiveTab('ingredients')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'ingredients' ? 'text-teal-600 border-b-2 border-teal-500 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Director's View</button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
-        
-        {/* Progress Overlay */}
         {project.isGenerating && (
             <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
                 <div className="max-w-md w-full space-y-6">
                     <Loader2 className="animate-spin text-pink-500 mx-auto" size={48} />
                     <h3 className="text-2xl font-display font-bold text-slate-900">Production In Progress</h3>
-                    
                     <div className="space-y-4">
-                        {/* Phase 1: Planning */}
-                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'planning' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                            {project.currentPhase !== 'planning' && project.scenes.length > 0 ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 1: Creative Brief & Storyboard</span>
-                        </div>
-                        {/* Phase 1.5: Storyboarding (NEW) */}
-                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'storyboarding' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                             {(project.currentPhase !== 'planning' && project.currentPhase !== 'storyboarding') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 2: Storyboarding (Image Gen)</span>
-                        </div>
-                        {/* Phase 2: Video */}
-                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'video_production' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                             {(project.currentPhase === 'voiceover' || project.currentPhase === 'scoring' || project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 3: Video Generation (Veo)</span>
-                        </div>
-                        {/* Phase 3: VO */}
-                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'voiceover' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                             {(project.currentPhase === 'scoring' || project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 4: Voiceover Recording (TTS)</span>
-                        </div>
-                        {/* Phase 4: Scoring */}
-                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'scoring' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                             {(project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 5: Music Composition (Lyria)</span>
-                        </div>
-                         {/* Phase 5: Mixing */}
-                         <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'mixing' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                             {project.currentPhase === 'ready' ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 6: Final Mix & Stitch</span>
-                        </div>
+                        {/* Status indicators */}
+                        {['planning', 'storyboarding', 'video_production', 'voiceover', 'scoring', 'mixing', 'ready'].map((phase, i) => {
+                            const labels: any = {planning: 'Creative Brief', storyboarding: 'Storyboards', video_production: 'Video Generation', voiceover: 'Voice Recording', scoring: 'Music Composition', mixing: 'Final Mix', ready: 'Ready'};
+                            const isActive = project.currentPhase === phase;
+                            const isDone = ['planning', 'storyboarding', 'video_production', 'voiceover', 'scoring', 'mixing', 'ready'].indexOf(project.currentPhase) > i;
+                            return (
+                                <div key={phase} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${isActive ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                                    {isDone ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                                    <span className="font-bold">{labels[phase]}</span>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             </div>
         )}
 
-        {/* Exporting Overlay */}
         {isExporting && (
              <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center text-white">
                 <Loader2 className="animate-spin text-pink-500 mx-auto mb-4" size={48} />
@@ -665,95 +568,38 @@ const ProjectBoard: React.FC<{
 
         {activeTab === 'output' ? (
           <div className="flex flex-col items-center h-full">
-            {/* Audio Elements (Hidden but Active) */}
-            {/* Note: crossOrigin="anonymous" is crucial for MediaElementSource capture if served from CDN (not applicable here for blob, but good practice) */}
             {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 0.3; }} />}
             {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 1.0; }} />}
 
-            {/* Video Sequencer Container */}
             <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${
                 settings.aspectRatio === '16:9' ? 'w-full aspect-video' : 'h-[50vh] md:h-[600px] aspect-[9/16]'
             }`}>
-                {/* Render ALL video elements stacked. Control Z-Index and Opacity */}
                 {project.scenes.map((scene, idx) => (
                     <React.Fragment key={scene.id}>
-                        {/* Display Storyboard Image if Video is not ready yet */}
                         {scene.storyboardUrl && !scene.videoUrl && (
-                            <img 
-                                src={scene.storyboardUrl}
-                                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
-                                style={{
-                                    opacity: idx === 0 ? 1 : 0, // Simplified preview logic for storyboards: just show first or overlay handled by sequencer
-                                    // Actually, let sequencer handle visibility if playing, but if not playing, show first?
-                                    // Better: If video doesn't exist, show image at correct index
-                                    zIndex: idx === 0 ? 5 : 0
-                                }}
-                            />
+                            <img src={scene.storyboardUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out" style={{ opacity: idx === 0 ? 1 : 0, zIndex: idx === 0 ? 5 : 0 }} />
                         )}
-                        
-                        <video
-                            preload="auto"
-                            ref={(el) => { videoRefs.current[idx] = el; }}
-                            src={scene.videoUrl}
-                            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
-                            style={{ 
-                                opacity: idx === 0 ? 1 : 0,
-                                zIndex: idx === 0 ? 10 : 0
-                            }}
-                            muted // Muted as we use separate audio tracks
-                            playsInline
-                            loop // Loop individual clips so they don't freeze if timing is off by ms
-                            crossOrigin="anonymous" // Important for canvas capture if needed
-                        />
+                        <video preload="auto" ref={(el) => { videoRefs.current[idx] = el; }} src={scene.videoUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out" style={{ opacity: idx === 0 ? 1 : 0, zIndex: idx === 0 ? 10 : 0 }} muted playsInline loop crossOrigin="anonymous" />
                     </React.Fragment>
                 ))}
-
-                {/* Overlays with Dynamic Positioning and Sizing */}
-                <div className={containerClasses}>
-                    <h2 className={textClasses}>
-                        {activeScene?.textOverlay}
-                    </h2>
-                </div>
-                {/* NO CONTROLS HERE - Moved below */}
+                <div className={containerClasses}><h2 className={textClasses}>{activeScene?.textOverlay}</h2></div>
             </div>
 
-            {/* --- NEW EXTERNAL PLAYER CONTROLS --- */}
             <div className="w-full mt-4 bg-white border border-slate-200 rounded-2xl p-3 md:p-4 shadow-xl flex flex-col md:flex-row items-center gap-4 z-10 max-w-4xl">
-                {/* Play & Time Group */}
                 <div className="flex items-center gap-4 w-full md:w-auto">
-                    <button 
-                        onClick={() => setIsPlaying(!isPlaying)}
-                        disabled={isExporting}
-                        className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-slate-900 rounded-full text-white hover:bg-pink-500 transition-all shadow-md shrink-0 disabled:opacity-50"
-                    >
+                    <button onClick={() => setIsPlaying(!isPlaying)} disabled={isExporting} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-slate-900 rounded-full text-white hover:bg-pink-500 transition-all shadow-md shrink-0 disabled:opacity-50">
                         {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
                     </button>
                     <div className="flex flex-col">
-                        <span className="font-mono text-sm font-bold text-slate-700">
-                            {formatTime(currentTime)} <span className="text-slate-400">/ {formatTime(totalDuration)}</span>
-                        </span>
+                        <span className="font-mono text-sm font-bold text-slate-700">{formatTime(currentTime)} <span className="text-slate-400">/ {formatTime(totalDuration)}</span></span>
                         <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Preview</span>
                     </div>
                 </div>
-
-                {/* Scrubber */}
                 <div className="flex-1 w-full h-2 bg-slate-100 rounded-full overflow-hidden relative group cursor-pointer">
-                    <div 
-                        className="absolute top-0 left-0 h-full bg-slate-200 w-full"
-                    />
-                    <div 
-                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-orange-400 transition-all duration-100 ease-linear"
-                        style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }}
-                    />
+                    <div className="absolute top-0 left-0 h-full bg-slate-200 w-full" />
+                    <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-orange-400 transition-all duration-100 ease-linear" style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }} />
                 </div>
-
-                {/* Download Button (Moved here) */}
-                <button 
-                    onClick={handleExport}
-                    disabled={isExporting || isPlaying}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    title="Render & Download"
-                >
+                <button onClick={handleExport} disabled={isExporting || isPlaying} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" title="Render & Download">
                      {isExporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
                      <span>{isExporting ? 'Rendering...' : 'Download'}</span>
                 </button>
@@ -769,84 +615,94 @@ const ProjectBoard: React.FC<{
           </div>
         ) : (
           <div className="space-y-6">
-            <h3 className="text-xl font-display font-bold text-slate-800">Master Tracks</h3>
-            
-            {/* Master Audio Tracks */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-pink-50 border border-pink-100 p-4 rounded-xl flex flex-col gap-2">
-                    <div className="flex items-center gap-2 text-pink-700 font-bold">
-                        <Mic size={18} /> Master Voiceover
-                    </div>
-                    {project.script && project.script.length > 0 ? (
-                        <div className="text-xs space-y-2 mt-1 h-32 overflow-y-auto pr-1">
-                             {project.script.map((line, i) => (
-                                 <div key={i} className="flex gap-2">
-                                     <span className="font-bold text-pink-800 shrink-0 w-16 text-right">{line.speaker}:</span>
-                                     <span className="text-slate-600">{line.text}</span>
-                                 </div>
-                             ))}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-slate-600 italic line-clamp-3">"{project.fullScript}"</p>
-                    )}
-                    
-                    {project.voiceoverUrl ? (
-                        <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" crossOrigin="anonymous" onError={(e) => handleAudioError("Voice Master", e)} />
-                    ) : (
-                        <div className="text-xs text-red-400 italic">No audio generated.</div>
-                    )}
-                </div>
-                <div className="bg-teal-50 border border-teal-100 p-4 rounded-xl flex flex-col gap-2">
-                     <div className="flex items-center gap-2 text-teal-700 font-bold">
-                        <Music size={18} /> Master Score
-                    </div>
-                    <p className="text-xs text-slate-600 capitalize">{project.musicMood} Theme</p>
-                     {project.musicUrl ? (
-                        <audio controls src={project.musicUrl} className="w-full h-8 mt-2" crossOrigin="anonymous" onError={(e) => handleAudioError("Music Master", e)} />
-                    ) : (
-                        <div className="text-xs text-red-400 italic">No audio generated.</div>
-                    )}
-                </div>
-            </div>
+             <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm space-y-4">
+                 <h3 className="text-xl font-display font-bold text-slate-800 flex items-center gap-2">
+                    <VenetianMask className="text-purple-500" />
+                    Director's Breakdown
+                 </h3>
+                 <p className="text-sm text-slate-500">
+                     The AI Agent has deconstructed the video into granular technical components to ensure maximum consistency across scenes.
+                 </p>
+             </div>
 
-            <h3 className="text-xl font-display font-bold text-slate-800 mt-8">Visual Timeline</h3>
-            <div className="space-y-2">
+             <div className="space-y-8">
                 {project.scenes.map((scene, idx) => (
-                    <div key={scene.id} className="flex items-center gap-4 p-3 bg-white border border-slate-100 rounded-lg">
-                        <div className="w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center text-xs font-bold">{idx + 1}</div>
-                        
-                        {/* Storyboard / Video Thumbnail */}
-                        <div className="w-24 aspect-video bg-black rounded overflow-hidden relative">
-                             {scene.videoUrl ? (
-                                <video src={scene.videoUrl} className="w-full h-full object-cover" />
-                             ) : scene.storyboardUrl ? (
-                                <>
-                                    <img src={scene.storyboardUrl} className="w-full h-full object-cover opacity-80" />
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <Loader2 className="animate-spin text-white w-6 h-6" />
-                                    </div>
-                                </>
-                             ) : (
-                                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
-                                    <ImageIcon size={16} />
-                                </div>
-                             )}
+                    <div key={scene.id} className="relative group">
+                         <div className="flex items-center gap-4 mb-2">
+                            <div className="w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</div>
+                            <h4 className="font-bold text-slate-700">Scene {idx + 1} ({scene.duration}s)</h4>
                         </div>
                         
-                        <div className="flex-1">
-                            <div className="text-xs font-bold text-slate-500 uppercase">Duration: {scene.duration}s</div>
-                            <div className="text-sm text-slate-800 line-clamp-1">{scene.visualPrompt}</div>
-                            {/* Visual indicator of text placement logic */}
-                            {scene.overlayConfig && (
-                                <div className="mt-1 flex gap-2">
-                                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">Pos: {scene.overlayConfig.position}</span>
-                                    <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-mono">Size: {scene.overlayConfig.size}</span>
-                                </div>
-                            )}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                             {/* VISUAL */}
+                             <div className="md:col-span-4 lg:col-span-3">
+                                 <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg relative">
+                                    {scene.videoUrl ? (
+                                        <video src={scene.videoUrl} className="w-full h-full object-cover" />
+                                    ) : scene.storyboardUrl ? (
+                                        <img src={scene.storyboardUrl} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><ImageIcon size={24}/></div>
+                                    )}
+                                    <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm p-2 rounded-lg">
+                                        <p className="text-[10px] text-white/90 line-clamp-2">{scene.visual_summary_prompt}</p>
+                                    </div>
+                                 </div>
+                             </div>
+
+                             {/* INGREDIENTS */}
+                             <div className="md:col-span-8 lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                 {/* Camera Card */}
+                                 <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl">
+                                     <div className="flex items-center gap-2 text-blue-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                         <Camera size={14} /> Camera
+                                     </div>
+                                     <div className="space-y-1">
+                                         <p className="text-xs text-slate-700"><span className="font-bold">Framing:</span> {scene.camera.framing}</p>
+                                         <p className="text-xs text-slate-700"><span className="font-bold">Move:</span> {scene.camera.movement}</p>
+                                     </div>
+                                 </div>
+
+                                 {/* Lighting Card */}
+                                 <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl">
+                                     <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                         <Sun size={14} /> Lighting & Env
+                                     </div>
+                                      <div className="space-y-1">
+                                         <p className="text-xs text-slate-700"><span className="font-bold">Light:</span> {scene.environment.lighting}</p>
+                                         <p className="text-xs text-slate-700"><span className="font-bold">Loc:</span> {scene.environment.location}</p>
+                                     </div>
+                                 </div>
+
+                                 {/* Wardrobe Card */}
+                                 <div className="bg-purple-50 border border-purple-100 p-3 rounded-xl">
+                                     <div className="flex items-center gap-2 text-purple-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                         <Shirt size={14} /> Character
+                                     </div>
+                                     <div className="space-y-1">
+                                         <p className="text-xs text-slate-700 line-clamp-2">{scene.character.description}</p>
+                                         <p className="text-[10px] text-purple-600 font-mono mt-1 bg-purple-100/50 p-1 rounded">
+                                             Wearing: {scene.character.wardrobe}
+                                         </p>
+                                     </div>
+                                 </div>
+
+                                 {/* Action Card */}
+                                 <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+                                     <div className="flex items-center gap-2 text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
+                                         <Video size={14} /> Action Blocking
+                                     </div>
+                                     <ul className="text-xs text-slate-600 list-disc list-inside space-y-1">
+                                         {scene.action_blocking.map((action, i) => (
+                                             <li key={i}>{action.notes}</li>
+                                         ))}
+                                     </ul>
+                                 </div>
+                             </div>
                         </div>
                     </div>
                 ))}
-            </div>
+             </div>
           </div>
         )}
       </div>
@@ -854,164 +710,189 @@ const ProjectBoard: React.FC<{
   );
 }
 
-// ... (AgentChat remains unchanged) ...
-// --- AgentChat ---
 const AgentChat: React.FC<{
   onGenerate: (prompt: string, attachments?: ChatAttachment[]) => void;
   isProcessing: boolean;
-  project?: AdProject | null;
+  project: AdProject | null;
 }> = ({ onGenerate, isProcessing, project }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: '1', role: 'model', text: 'Hello! I am your AI Creative Director. Tell me about the ad you want to create.', timestamp: Date.now() }
+  ]);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Hello! I am your AI Creative Director. Ready to produce your ad?', timestamp: Date.now() }]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
-  
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-          Array.from(e.target.files).forEach(file => {
-              const reader = new FileReader();
-              reader.onload = (ev) => {
-                  const base64 = (ev.target?.result as string).split(',')[1];
-                  const newAtt: ChatAttachment = {
-                      id: Date.now().toString() + Math.random(),
-                      type: file.type.startsWith('image') ? 'image' : 'video',
-                      url: URL.createObjectURL(file),
-                      mimeType: file.type,
-                      base64Data: base64
-                  };
-                  setPendingAttachments(prev => [...prev, newAtt]);
-              };
-              reader.readAsDataURL(file);
-          });
-      }
-      // Reset input
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const addLink = () => {
-    if (!linkUrl.trim()) return;
-    const newAtt: ChatAttachment = {
-        id: Date.now().toString() + Math.random(),
-        type: 'link',
-        url: linkUrl,
-        mimeType: 'text/uri-list',
-        base64Data: '' // No binary data for links
-    };
-    setPendingAttachments(prev => [...prev, newAtt]);
-    setLinkUrl('');
-    setShowLinkInput(false);
-  };
-
-  const removeAttachment = (id: string) => {
-      setPendingAttachments(prev => prev.filter(p => p.id !== id));
-  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isOpen]);
 
   const handleSend = async () => {
-    if (!input.trim() && pendingAttachments.length === 0) return;
-    
-    // Capture current state to send
-    const attachmentsToSend = [...pendingAttachments];
-    const textToSend = input;
-
-    // Reset Input UI immediately
-    setInput('');
-    setPendingAttachments([]);
+    if ((!input.trim() && attachments.length === 0) || isProcessing) return;
 
     const userMsg: ChatMessage = { 
         id: Date.now().toString(), 
         role: 'user', 
-        text: textToSend, 
+        text: input, 
         timestamp: Date.now(),
-        attachments: attachmentsToSend 
+        attachments: [...attachments]
     };
-    setMessages(prev => [...prev, userMsg]);
     
-    // Command Detection
-    if (textToSend.toLowerCase().includes('create') || textToSend.toLowerCase().includes('generate')) {
-        onGenerate(textToSend, attachmentsToSend);
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setAttachments([]);
+    
+    // Check if we should generate a project
+    const isGenerationRequest = input.toLowerCase().includes('generate') || input.toLowerCase().includes('create') || input.toLowerCase().includes('make a video');
+    
+    if (isGenerationRequest && !project) {
+        // Trigger generation
+        const thinkingMsg: ChatMessage = { id: 'thinking', role: 'model', text: 'Developing creative concept...', timestamp: Date.now(), isThinking: true };
+        setMessages(prev => [...prev, thinkingMsg]);
+        
+        await onGenerate(input, userMsg.attachments);
+        
+        setMessages(prev => prev.filter(m => m.id !== 'thinking').concat({
+            id: Date.now().toString(),
+            role: 'model',
+            text: "I've drafted a creative brief and storyboard based on your request. Check out the project board!",
+            timestamp: Date.now()
+        }));
     } else {
-        setIsAnalyzing(true);
-        const response = await GeminiService.sendChatMessage(
-            messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })), // History (simplified text for now)
-            textToSend,
-            project || undefined,
-            attachmentsToSend // Pass actual binary for this turn
-        );
-        setIsAnalyzing(false);
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: response, timestamp: Date.now() }]);
+         // Normal Chat
+         const thinkingMsg: ChatMessage = { id: 'thinking', role: 'model', text: 'Thinking...', timestamp: Date.now(), isThinking: true };
+         setMessages(prev => [...prev, thinkingMsg]);
+
+         try {
+             const history = messages.map(m => ({
+                 role: m.role,
+                 parts: [{ text: m.text }]
+             }));
+             
+             const response = await GeminiService.sendChatMessage(history, userMsg.text, project || undefined, userMsg.attachments);
+             
+             setMessages(prev => prev.filter(m => m.id !== 'thinking').concat({
+                 id: Date.now().toString(),
+                 role: 'model',
+                 text: response || "I'm not sure how to respond to that.",
+                 timestamp: Date.now()
+             }));
+         } catch (e) {
+             setMessages(prev => prev.filter(m => m.id !== 'thinking').concat({
+                 id: Date.now().toString(),
+                 role: 'model',
+                 text: "Sorry, I encountered an error.",
+                 timestamp: Date.now()
+             }));
+         }
     }
   };
 
+  const handleAttachment = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              const result = ev.target?.result as string;
+              const base64 = result.split(',')[1];
+              const newAtt: ChatAttachment = {
+                  id: Date.now().toString(),
+                  type: file.type.startsWith('image/') ? 'image' : 'link', // Basic check
+                  url: URL.createObjectURL(file), // Preview URL
+                  mimeType: file.type,
+                  base64Data: base64
+              };
+              setAttachments(prev => [...prev, newAtt]);
+          };
+          reader.readAsDataURL(file);
+      }
+  }
+
+  const addLink = () => {
+    if (!linkUrl.trim()) return;
+    const newAtt: ChatAttachment = {
+        id: Date.now().toString(),
+        type: 'link',
+        url: linkUrl,
+        mimeType: 'text/uri-list',
+        base64Data: ''
+    };
+    setAttachments(prev => [...prev, newAtt]);
+    setLinkUrl('');
+    setShowLinkInput(false);
+  };
+
   return (
-    <div className={`absolute bottom-4 right-4 md:bottom-8 md:right-8 z-50 transition-all duration-300 ${isOpen ? 'w-[calc(100vw-2rem)] md:w-96 h-[600px]' : 'w-16 h-16'}`}>
-      {!isOpen && <button onClick={() => setIsOpen(true)} className="w-16 h-16 rounded-full bg-slate-900 text-white shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"><MessageSquare size={24} /></button>}
-      {isOpen && (
-        <div className="w-full h-full flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden ring-4 ring-slate-900/5">
-          <div className="bg-slate-900 text-white p-4 flex justify-between items-center">
-            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="font-bold font-display">Creative Director</span></div>
-            <button onClick={() => setIsOpen(false)} className="opacity-70 hover:opacity-100"><X size={18} /></button>
-          </div>
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+    <div className={`
+        fixed bottom-0 right-0 w-full lg:w-96 lg:right-6 lg:bottom-6 
+        bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl border border-slate-200 z-[100] 
+        flex flex-col overflow-hidden transition-all duration-300 ease-in-out
+        ${isOpen ? 'h-[60vh] lg:h-[600px]' : 'h-14'}
+    `}>
+        {/* Header */}
+        <div 
+            className="p-4 bg-slate-900 text-white flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors"
+            onClick={() => setIsOpen(!isOpen)}
+        >
+            <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="font-bold text-sm">AI Creative Director</span>
+            </div>
+            <div className="flex items-center gap-2">
+                {isProcessing && <Loader2 size={16} className="animate-spin text-pink-500" />}
+                {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+            </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
             {messages.map(msg => (
-                <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                    {/* Render Attachments in History */}
-                    {msg.attachments && msg.attachments.length > 0 && (
-                        <div className={`flex gap-2 mb-1 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            {msg.attachments.map(att => (
-                                <div key={att.id} className="w-24 h-24 rounded-lg overflow-hidden border border-slate-200 shadow-sm relative flex items-center justify-center bg-slate-100">
-                                    {att.type === 'image' ? (
-                                        <img src={att.url} className="w-full h-full object-cover" />
-                                    ) : att.type === 'video' ? (
-                                        <video src={att.url} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-1 p-2 text-center">
-                                            <Youtube size={24} className="text-red-500" />
-                                            <span className="text-[10px] text-slate-500 leading-tight truncate w-full">{att.url}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'}`}>{msg.text}</div>
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'}`}>
+                        {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="mb-2 flex gap-2 overflow-x-auto">
+                                {msg.attachments.map(att => (
+                                    <div key={att.id} className="relative group shrink-0">
+                                         {att.type === 'image' ? (
+                                             <img src={att.url} className="w-16 h-16 object-cover rounded-lg border border-white/20" />
+                                         ) : (
+                                             <div className="w-16 h-16 rounded-lg bg-slate-100 flex items-center justify-center text-red-500">
+                                                 <Youtube size={24} />
+                                             </div>
+                                         )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {msg.isThinking ? (
+                            <div className="flex gap-1 items-center">
+                                <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" />
+                                <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-75" />
+                                <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-150" />
+                            </div>
+                        ) : (
+                            <p className="whitespace-pre-wrap">{msg.text}</p>
+                        )}
+                    </div>
                 </div>
             ))}
-            
-            {/* Processing States */}
-            {isProcessing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Loader2 className="animate-spin" size={12} />Producing Ad...</div></div>}
-            {isAnalyzing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Eye className="animate-pulse" size={12} />Analyzing Context...</div></div>}
-          </div>
-          
-          <div className="p-3 bg-white border-t border-slate-100 space-y-2">
-            
-            {/* Attachment Preview Area */}
-            {pendingAttachments.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto py-2">
-                    {pendingAttachments.map(att => (
-                        <div key={att.id} className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-slate-200 group bg-slate-50 flex items-center justify-center">
-                            {att.type === 'image' ? <img src={att.url} className="w-full h-full object-cover" /> : 
-                             att.type === 'video' ? <video src={att.url} className="w-full h-full object-cover" /> :
-                             <Youtube className="text-red-500" />}
-                            <button onClick={() => removeAttachment(att.id)} className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
-                        </div>
-                    ))}
-                </div>
-            )}
-            
-            {/* Link Input Drawer */}
+            <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-3 bg-white border-t border-slate-200">
             {showLinkInput && (
-                <div className="flex gap-2 animate-in slide-in-from-bottom-2">
+                <div className="flex gap-2 mb-2 animate-in slide-in-from-bottom-2">
                     <input 
                         type="text" 
-                        placeholder="Paste URL..." 
+                        placeholder="Paste YouTube or Web URL..." 
                         className="flex-1 bg-slate-100 text-slate-900 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-pink-500"
                         value={linkUrl}
                         onChange={(e) => setLinkUrl(e.target.value)}
@@ -1021,250 +902,255 @@ const AgentChat: React.FC<{
                     <button onClick={() => setShowLinkInput(false)} className="bg-slate-200 text-slate-600 px-2 rounded-lg"><X size={14}/></button>
                 </div>
             )}
-
-            <div className="flex gap-2 items-center">
+            
+            {attachments.length > 0 && (
+                <div className="flex gap-2 mb-2 px-2">
+                    {attachments.map(att => (
+                        <div key={att.id} className="relative group">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 flex items-center justify-center">
+                                {att.type === 'image' ? <img src={att.url} className="w-full h-full object-cover" /> : <LinkIcon size={16} className="text-slate-400"/>}
+                            </div>
+                            <button onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10} /></button>
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div className="flex items-center gap-2">
+                 <button onClick={() => setShowLinkInput(!showLinkInput)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-full transition-colors">
+                    <LinkIcon size={20} />
+                 </button>
+                 <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                    <Paperclip size={20} />
+                 </button>
+                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAttachment} />
+                 
+                 <input 
+                    className="flex-1 bg-slate-100 text-slate-900 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-pink-500 outline-none"
+                    placeholder="Describe your ad..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    disabled={isProcessing}
+                 />
                  <button 
-                    onClick={() => setShowLinkInput(!showLinkInput)}
-                    className="p-2 text-slate-400 hover:text-red-500 transition-colors bg-slate-100 rounded-full hover:bg-pink-50"
-                    title="Attach Link"
+                    onClick={handleSend} 
+                    disabled={(!input && attachments.length === 0) || isProcessing}
+                    className="p-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                 >
-                    <LinkIcon size={18} />
-                </button>
-                <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2 text-slate-400 hover:text-pink-500 transition-colors bg-slate-100 rounded-full hover:bg-pink-50"
-                    title="Attach Image or Video"
-                >
-                    <Paperclip size={18} />
-                </button>
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*,video/*,application/pdf" 
-                    multiple 
-                    onChange={handleFileSelect} 
-                />
-                
-                <input type="text" className="flex-1 bg-slate-100 text-slate-900 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500" placeholder="Type request..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} />
-                <button onClick={handleSend} className="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 disabled:opacity-50" disabled={!input.trim() && pendingAttachments.length === 0}><ArrowUpCircle size={20} /></button>
+                    <ArrowUpCircle size={24} />
+                 </button>
             </div>
-          </div>
         </div>
-      )}
     </div>
   );
-};
+}
 
-// --- Main App ---
-export function App() {
-  const [apiKeyReady, setApiKeyReady] = useState(!!process.env.API_KEY);
-  const [referenceFiles, setReferenceFiles] = useState<ReferenceFile[]>([]);
-  const [visualAnchor, setVisualAnchor] = useState<ReferenceFile | null>(null);
-  const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine, mode: 'Commercial' });
-  const [project, setProject] = useState<AdProject | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showLeftPanel, setShowLeftPanel] = useState(false);
-  const [showRightPanel, setShowRightPanel] = useState(false);
+export const App: React.FC = () => {
+    // ... (Existing state hooks)
+    const [files, setFiles] = useState<ReferenceFile[]>([]);
+    const [visualAnchor, setVisualAnchor] = useState<ReferenceFile | null>(null);
+    const [settings, setSettings] = useState<ProjectSettings>({
+        customScript: '',
+        musicTheme: 'Commercial',
+        useTextOverlays: 'auto',
+        preferredVoice: 'auto',
+        aspectRatio: AspectRatio.SixteenNine,
+        mode: 'Commercial' as ProjectMode
+    });
+    const [project, setProject] = useState<AdProject | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [showLeftPanel, setShowLeftPanel] = useState(false);
+    const [showRightPanel, setShowRightPanel] = useState(false);
+    const [hasKey, setHasKey] = useState(false);
 
-  useEffect(() => {
-    const initKey = async () => {
-        if (process.env.API_KEY) return;
-        if (window.aistudio) {
-            const hasKey = await window.aistudio.hasSelectedApiKey();
-            if (hasKey) setApiKeyReady(true);
+    useEffect(() => {
+        const checkKey = async () => {
+            // @ts-ignore
+            if (window.aistudio) {
+                // @ts-ignore
+                const has = await window.aistudio.hasSelectedApiKey();
+                setHasKey(has);
+            } else {
+                setHasKey(true); 
+            }
+        };
+        checkKey();
+    }, []);
+
+    const handleGenerate = async (prompt: string, attachments?: ChatAttachment[]) => {
+        setIsProcessing(true);
+        try {
+            // 1. Plan
+            const plan = await GeminiService.generateAdPlan(prompt, settings, files);
+            
+            const newProject: AdProject = {
+                ...plan,
+                isGenerating: true,
+                currentPhase: 'storyboarding',
+                scenes: plan.scenes.map((s: any) => ({ ...s, status: 'pending' })),
+                mode: settings.mode
+            };
+            setProject(newProject);
+    
+            // 2. Storyboards
+            const scenesWithStoryboards = await Promise.all(newProject.scenes.map(async (scene: Scene) => {
+                const img = await GeminiService.generateStoryboardImage(
+                    scene, // PASSING FULL SCENE OBJECT NOW
+                    settings.aspectRatio, 
+                    visualAnchor?.content
+                );
+                return { ...scene, storyboardUrl: img || undefined, status: 'pending' } as Scene;
+            }));
+    
+            setProject(prev => prev ? { ...prev, scenes: scenesWithStoryboards as any, currentPhase: 'video_production' } : null);
+    
+            // 3. Videos
+            const scenesWithVideo: any[] = [];
+            
+            for (const scene of scenesWithStoryboards) {
+                 setProject(prev => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        scenes: prev.scenes.map(s => s.id === scene.id ? { ...s, status: 'generating' } as Scene : s)
+                    };
+                });
+    
+                const video = await GeminiService.generateVideoClip(
+                    scene, // PASSING FULL SCENE OBJECT
+                    settings.aspectRatio, 
+                    scene.storyboardUrl
+                );
+                
+                const updatedScene = { ...scene, videoUrl: video || undefined, status: 'complete' } as Scene;
+                scenesWithVideo.push(updatedScene);
+    
+                setProject(prev => {
+                    if (!prev) return null;
+                    return {
+                        ...prev,
+                        scenes: prev.scenes.map(s => s.id === scene.id ? updatedScene : s) as any
+                    };
+                });
+            }
+    
+            // 4. Audio
+            setProject(prev => prev ? { ...prev, currentPhase: 'voiceover' } : null);
+            const vo = await GeminiService.generateVoiceover(plan.fullScript, settings.preferredVoice === 'auto' ? TTSVoice.Kore : settings.preferredVoice, plan.script);
+            setProject(prev => prev ? { ...prev, currentPhase: 'scoring', voiceoverUrl: vo || undefined } : null);
+    
+            const music = await GeminiService.generateMusic(plan.musicMood || settings.musicTheme);
+            setProject(prev => prev ? { ...prev, currentPhase: 'ready', musicUrl: music || undefined, isGenerating: false } : null);
+    
+        } catch (e) {
+            console.error("Generation failed", e);
+            setIsProcessing(false);
+            setProject(prev => prev ? { ...prev, isGenerating: false } : null);
         }
     };
-    initKey();
-  }, []);
 
-  const handleApiKeySelection = async () => {
-    if (window.aistudio) {
-        await window.aistudio.openSelectKey();
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (hasKey) setApiKeyReady(true);
-    } else { 
-        alert("This app requires an API Key."); 
+    if (!hasKey) {
+        // ... (Render Key Selection Screen - Unchanged)
+        return (
+             <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-6 p-4">
+                 <div className="text-center space-y-2">
+                    <h1 className="text-3xl font-display font-bold text-slate-900">AdStudio.ai</h1>
+                    <p className="text-slate-500">Video generation requires a paid API key.</p>
+                 </div>
+                 <button onClick={async () => {
+                     // @ts-ignore
+                     if (window.aistudio) {
+                         // @ts-ignore
+                         await window.aistudio.openSelectKey();
+                         // @ts-ignore
+                         const has = await window.aistudio.hasSelectedApiKey();
+                         setHasKey(has);
+                     }
+                 }} className="bg-slate-900 text-white px-8 py-3 rounded-full font-bold hover:bg-slate-800 transition-colors shadow-lg flex items-center gap-2">
+                     <Sparkles size={18} /> Select API Key
+                 </button>
+                 <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-sm text-pink-500 font-bold hover:underline">Billing Information</a>
+             </div>
+         )
     }
-  };
 
-  const handleGenerateProject = async (prompt: string, chatAttachments?: ChatAttachment[]) => {
-    setIsProcessing(true);
-    try {
-        // Phase 3.5: Multimodal Injection
-        let effectiveReferences = [...referenceFiles];
-        
-        if (chatAttachments && chatAttachments.length > 0) {
-            const chatRefs: ReferenceFile[] = chatAttachments.map(att => ({
-                id: att.id,
-                name: att.type === 'link' ? att.url : `Chat Attachment (${att.type})`,
-                type: att.type === 'link' ? 'link' : 'image', // Maps chat types to ref types
-                content: att.type === 'link' ? att.url : `data:${att.mimeType};base64,${att.base64Data}`,
-                mimeType: att.mimeType,
-            }));
-            effectiveReferences = [...effectiveReferences, ...chatRefs];
-        }
-
-        // Phase 1: Planning
-        const plan = await GeminiService.generateAdPlan(prompt, settings, effectiveReferences);
-        
-        const newProject: AdProject = {
-            title: plan.title, 
-            concept: plan.concept, 
-            musicMood: plan.musicMood, 
-            fullScript: plan.fullScript,
-            script: plan.script,
-            scenes: plan.scenes.map((s: any) => ({ ...s, status: 'pending' })),
-            ffmpegCommand: plan.ffmpegCommand, 
-            isGenerating: true, 
-            currentPhase: 'planning',
-            visualAnchor: visualAnchor?.content,
-            mode: settings.mode
-        };
-        setProject(newProject);
-
-        // Phase 1.5: Storyboarding (Generate Images First)
-        setProject(prev => prev ? ({...prev, currentPhase: 'storyboarding'}) : null);
-        const storybardedScenes = [...newProject.scenes];
-        
-        for (let i = 0; i < storybardedScenes.length; i++) {
-             // Generate Image Keyframe using Gemini 3 Pro Image (or 2.5 flash image via flag logic if we wanted speed, but high quality requested)
-             const imgUrl = await GeminiService.generateStoryboardImage(
-                storybardedScenes[i].visualPrompt,
-                settings.aspectRatio,
-                visualAnchor?.content // Enforce Character Consistency Here
-             );
-             storybardedScenes[i].storyboardUrl = imgUrl || undefined;
-             // Update project state so UI shows the image
-             setProject(prev => prev ? ({ ...prev, scenes: [...storybardedScenes] }) : null);
-        }
-
-        // Phase 2: Video Production (Image-to-Video)
-        setProject(prev => prev ? ({...prev, currentPhase: 'video_production'}) : null);
-        const updatedScenes = [...storybardedScenes];
-        for (let i = 0; i < updatedScenes.length; i++) {
-            // Use the Storyboard Image as input for Veo
-            const videoUrl = await GeminiService.generateVideoClip(
-                updatedScenes[i].visualPrompt, 
-                settings.aspectRatio,
-                updatedScenes[i].storyboardUrl || visualAnchor?.content // Fallback to visual anchor if storyboard failed
-            );
-            updatedScenes[i].videoUrl = videoUrl || undefined;
-            updatedScenes[i].status = 'complete';
-            setProject(prev => prev ? ({ ...prev, scenes: [...updatedScenes] }) : null);
-        }
-
-        // Phase 3: Voiceover
-        setProject(prev => prev ? ({...prev, currentPhase: 'voiceover'}) : null);
-        const voiceToUse = settings.preferredVoice !== 'auto' ? settings.preferredVoice : TTSVoice.Kore;
-        const voUrl = await GeminiService.generateVoiceover(plan.fullScript, voiceToUse as TTSVoice, plan.script);
-        setProject(prev => prev ? ({...prev, voiceoverUrl: voUrl || undefined}) : null);
-
-        // Phase 4: Scoring
-        setProject(prev => prev ? ({...prev, currentPhase: 'scoring'}) : null);
-        const musicUrl = await GeminiService.generateMusic(plan.musicMood);
-        setProject(prev => prev ? ({...prev, musicUrl: musicUrl || undefined}) : null);
-
-        // Phase 5: Final Mix
-        setProject(prev => prev ? ({...prev, currentPhase: 'mixing'}) : null);
-        await new Promise(r => setTimeout(r, 1000));
-        setProject(prev => prev ? ({...prev, currentPhase: 'ready', isGenerating: false}) : null);
-
-    } catch (e) {
-        console.error("Generation failed", e);
-        alert("Failed to generate project. See console.");
-        setIsProcessing(false);
-    } finally {
-        setIsProcessing(false);
-    }
-  };
-
-  if (!apiKeyReady) {
     return (
-        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white space-y-6 text-center px-4">
-            <h1 className="text-4xl md:text-5xl font-display font-bold">AdStudio<span className="text-pink-500">.ai</span></h1>
-            <p className="text-slate-400 max-w-md">Create world-class video ads with a fully autonomous creative director.</p>
-            <button onClick={handleApiKeySelection} className="px-8 py-4 bg-white text-slate-900 rounded-full font-bold hover:bg-pink-500 hover:text-white transition-all shadow-xl">Connect Google AI Studio Key</button>
-            <p className="text-xs text-slate-500 max-w-xs opacity-60">If you are the developer, ensure <code>API_KEY</code> is set in your environment variables.</p>
-        </div>
-    )
-  }
-
-  return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50">
-        <header className="h-16 flex items-center justify-between px-4 md:px-6 bg-white/40 backdrop-blur-md border-b border-white/50 z-20 relative">
-            <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
-                <Menu />
-            </button>
-            
-            <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg" />
-                <span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span>
-            </div>
-
-            <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
-                <Settings />
-            </button>
-
-            <div className="hidden lg:flex items-center gap-4">
-                <span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span>
-                <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md">
-                    <img src="https://picsum.photos/100" alt="User" />
-                </div>
-            </div>
-        </header>
-
-        <div className="flex-1 relative overflow-hidden">
-            <div className="w-full h-full grid grid-cols-1 lg:grid-cols-4">
+        <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50">
+            <header className="h-16 flex items-center justify-between px-4 md:px-6 bg-white/40 backdrop-blur-md border-b border-white/50 z-20 relative shrink-0">
+                {/* Mobile: Left Button opens Assets */}
+                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
+                    <Menu />
+                </button>
                 
-                {/* Left Panel (Reference Manager) */}
-                <div className={`
-                    fixed inset-y-0 left-0 w-80 lg:w-full lg:static lg:col-span-1 
-                    bg-white/80 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
-                    border-r border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
-                    ${showLeftPanel ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                `}>
-                    <div className="h-full relative pt-16 lg:pt-0">
-                        <button onClick={() => setShowLeftPanel(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
-                        <ReferenceManager 
-                            files={referenceFiles} 
-                            setFiles={setReferenceFiles} 
-                            visualAnchor={visualAnchor}
-                            setVisualAnchor={setVisualAnchor}
-                        />
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg flex items-center justify-center text-white font-bold font-display">A</div>
+                    <span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span>
+                </div>
+    
+                {/* Mobile: Right Button opens Settings */}
+                <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
+                    <Settings />
+                </button>
+    
+                <div className="hidden lg:flex items-center gap-4">
+                    <span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span>
+                    <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md">
+                        <img src="https://picsum.photos/100" alt="User" />
                     </div>
                 </div>
-
-                {/* Center Panel (Project Board) */}
-                <div className="col-span-1 lg:col-span-2 relative bg-white/5 w-full h-full overflow-hidden">
-                    <ProjectBoard project={project} setProject={setProject} settings={settings} />
-                </div>
-
-                {/* Right Panel (Settings) */}
-                <div className={`
-                    fixed inset-y-0 right-0 w-80 lg:w-full lg:static lg:col-span-1 
-                    bg-white/80 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
-                    border-l border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
-                    ${showRightPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
-                `}>
-                    <div className="h-full relative pt-16 lg:pt-0">
-                         <button onClick={() => setShowRightPanel(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
-                        <SettingsPanel settings={settings} setSettings={setSettings} />
+            </header>
+    
+            <div className="flex-1 relative overflow-hidden">
+                <div className="w-full h-full grid grid-cols-1 lg:grid-cols-4">
+                    
+                    {/* Left Panel (Reference Manager) - Sliding on Mobile */}
+                    <div className={`
+                        fixed inset-y-0 left-0 w-80 lg:w-full lg:static lg:col-span-1 
+                        bg-white/95 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
+                        border-r border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
+                        ${showLeftPanel ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                    `}>
+                        <div className="h-full relative pt-16 lg:pt-0">
+                            <button onClick={() => setShowLeftPanel(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
+                            <ReferenceManager 
+                                files={files} 
+                                setFiles={setFiles} 
+                                visualAnchor={visualAnchor}
+                                setVisualAnchor={setVisualAnchor}
+                            />
+                        </div>
                     </div>
+    
+                    {/* Center Panel (Project Board) */}
+                    <div className="col-span-1 lg:col-span-2 relative bg-white/5 w-full h-full overflow-hidden">
+                        <ProjectBoard project={project} setProject={setProject} settings={settings} />
+                    </div>
+    
+                    {/* Right Panel (Settings) - Sliding on Mobile */}
+                    <div className={`
+                        fixed inset-y-0 right-0 w-80 lg:w-full lg:static lg:col-span-1 
+                        bg-white/95 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
+                        border-l border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
+                        ${showRightPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+                    `}>
+                        <div className="h-full relative pt-16 lg:pt-0">
+                             <button onClick={() => setShowRightPanel(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16}/></button>
+                            <SettingsPanel settings={settings} setSettings={setSettings} />
+                        </div>
+                    </div>
+    
                 </div>
-
+    
+                 {/* Mobile Overlay for panels */}
+                {(showLeftPanel || showRightPanel) && (
+                    <div 
+                        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 lg:hidden"
+                        onClick={() => { setShowLeftPanel(false); setShowRightPanel(false); }}
+                    />
+                )}
             </div>
-
-             {/* Mobile Overlay for panels */}
-            {(showLeftPanel || showRightPanel) && (
-                <div 
-                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 lg:hidden"
-                    onClick={() => { setShowLeftPanel(false); setShowRightPanel(false); }}
-                />
-            )}
+            
+            <AgentChat onGenerate={handleGenerate} isProcessing={isProcessing} project={project} />
         </div>
-        
-        <AgentChat onGenerate={handleGenerateProject} isProcessing={isProcessing} project={project} />
-    </div>
-  );
+      );
 }

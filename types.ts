@@ -51,15 +51,50 @@ export interface OverlayConfig {
   size: 'small' | 'medium' | 'large' | 'xl';
 }
 
+// --- NEW DIRECTOR'S JSON STRUCTURES ---
+
+export interface CharacterDetails {
+  name: string;
+  description: string;
+  hair: string;
+  face: string;
+  wardrobe: string;
+}
+
+export interface EnvironmentDetails {
+  location: string;
+  look: string;
+  lighting: string;
+  background_motion: string;
+}
+
+export interface CameraDetails {
+  framing: string;
+  movement: string;
+  notes: string;
+}
+
+export interface ActionBlocking {
+  time_window: string;
+  notes: string;
+}
+
 export interface Scene {
   id: string;
   order: number;
   duration: 4 | 6;
-  visualPrompt: string;
+  
+  // New Rich Fields
+  character: CharacterDetails;
+  environment: EnvironmentDetails;
+  camera: CameraDetails;
+  action_blocking: ActionBlocking[];
+  visual_summary_prompt: string; // The "fallback" narrative string
+
   textOverlay: string;
   overlayConfig?: OverlayConfig;
   status: 'pending' | 'generating' | 'complete' | 'failed';
-  storyboardUrl?: string; // New: Holds the generated static image
+  storyboardUrl?: string;
   videoUrl?: string;
 }
 
@@ -70,6 +105,11 @@ export interface AdProject {
   fullScript: string;
   script?: DialogueLine[];
   
+  // Global context is still useful for the initial brief, 
+  // but individual scenes now carry specific overrides.
+  characterProfile?: string; 
+  visualStyleProfile?: string; 
+  
   scenes: Scene[];
   voiceoverUrl?: string;
   musicUrl?: string;
@@ -77,7 +117,6 @@ export interface AdProject {
   
   ffmpegCommand?: string;
   isGenerating: boolean;
-  // Added 'storyboarding' phase
   currentPhase: 'planning' | 'storyboarding' | 'video_production' | 'voiceover' | 'scoring' | 'mixing' | 'ready';
   mode?: ProjectMode;
 }
