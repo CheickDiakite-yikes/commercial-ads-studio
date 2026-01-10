@@ -12,12 +12,28 @@ export enum TTSVoice {
   Aoede = 'Aoede'
 }
 
+export type ProjectMode = 'Commercial' | 'Music Video' | 'Trippy' | 'Cinematic';
+
+export interface DialogueLine {
+  speaker: string;
+  text: string;
+}
+
 export interface ReferenceFile {
   id: string;
   name: string;
-  type: 'image' | 'pdf' | 'text';
-  content: string;
+  type: 'image' | 'pdf' | 'text' | 'link';
+  content: string; // Base64 or Text or URL
   previewUrl?: string;
+  mimeType?: string; 
+}
+
+export interface ChatAttachment {
+  id: string;
+  type: 'image' | 'video' | 'link';
+  url: string; 
+  mimeType: string;
+  base64Data: string; 
 }
 
 export interface ProjectSettings {
@@ -27,6 +43,7 @@ export interface ProjectSettings {
   textOverlayFont?: string;
   preferredVoice: TTSVoice | 'auto';
   aspectRatio: AspectRatio;
+  mode: ProjectMode;
 }
 
 export interface OverlayConfig {
@@ -37,30 +54,32 @@ export interface OverlayConfig {
 export interface Scene {
   id: string;
   order: number;
-  duration: 4 | 6; // Veo 3 constraints
+  duration: 4 | 6;
   visualPrompt: string;
-  textOverlay: string; // Text is still per-scene
-  overlayConfig?: OverlayConfig; // AI-determined placement and size
+  textOverlay: string;
+  overlayConfig?: OverlayConfig;
   status: 'pending' | 'generating' | 'complete' | 'failed';
-  videoUrl?: string; // The video blob
+  storyboardUrl?: string; // New: Holds the generated static image
+  videoUrl?: string;
 }
 
 export interface AdProject {
   title: string;
   concept: string;
   musicMood: string;
-  fullScript: string; // The cohesive script for the whole ad
+  fullScript: string;
+  script?: DialogueLine[];
   
-  // Assets
   scenes: Scene[];
-  voiceoverUrl?: string; // Single audio file for the whole ad
-  musicUrl?: string;     // Single audio file for the whole ad
-  visualAnchor?: string; // Data URL of the master visual reference (Character/Product)
+  voiceoverUrl?: string;
+  musicUrl?: string;
+  visualAnchor?: string;
   
-  // State
   ffmpegCommand?: string;
   isGenerating: boolean;
-  currentPhase: 'planning' | 'video_production' | 'voiceover' | 'scoring' | 'mixing' | 'ready';
+  // Added 'storyboarding' phase
+  currentPhase: 'planning' | 'storyboarding' | 'video_production' | 'voiceover' | 'scoring' | 'mixing' | 'ready';
+  mode?: ProjectMode;
 }
 
 export interface ChatMessage {
@@ -69,4 +88,5 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   isThinking?: boolean;
+  attachments?: ChatAttachment[]; 
 }

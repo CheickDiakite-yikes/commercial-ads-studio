@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig } from './types';
+import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig, ProjectMode, ChatAttachment } from './types';
 import * as GeminiService from './services/geminiService';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye, Sparkles, Paperclip, FileImage, FileVideo, Link as LinkIcon, Youtube, Image as ImageIcon } from 'lucide-react';
 
+// ... (ReferenceManager, SettingsPanel, Helpers remain unchanged) ...
 // --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
   files: ReferenceFile[];
@@ -12,18 +13,25 @@ const ReferenceManager: React.FC<{
 }> = ({ files, setFiles, visualAnchor, setVisualAnchor }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const anchorInputRef = useRef<HTMLInputElement>(null);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, isAnchor: boolean = false) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       const reader = new FileReader();
       reader.onload = (event) => {
+        const result = event.target?.result as string;
+        // Basic MimeType detection from Data URL
+        const mimeType = result.match(/^data:(.+);base64/)?.[1];
+        
         const newFile: ReferenceFile = {
           id: Date.now().toString(),
           name: file.name,
           type: file.type.includes('image') ? 'image' : file.type.includes('pdf') ? 'pdf' : 'text',
-          content: event.target?.result as string, 
-          previewUrl: file.type.includes('image') ? URL.createObjectURL(file) : undefined
+          content: result, 
+          previewUrl: file.type.includes('image') ? URL.createObjectURL(file) : undefined,
+          mimeType: mimeType // Store mimeType for API
         };
         if (isAnchor) {
             setVisualAnchor(newFile);
@@ -33,6 +41,19 @@ const ReferenceManager: React.FC<{
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const addLink = () => {
+    if (!linkUrl.trim()) return;
+    const newFile: ReferenceFile = {
+        id: Date.now().toString(),
+        name: linkUrl,
+        type: 'link',
+        content: linkUrl
+    };
+    setFiles(prev => [...prev, newFile]);
+    setLinkUrl('');
+    setShowLinkInput(false);
   };
 
   return (
@@ -90,14 +111,40 @@ const ReferenceManager: React.FC<{
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-display font-bold text-slate-800">Assets</h2>
-            <button 
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 bg-slate-900 text-white rounded-full hover:bg-pink-500 transition-colors shadow-lg"
-            >
-            <Plus size={20} />
-            </button>
+            <div className="flex gap-2">
+                <button 
+                    onClick={() => setShowLinkInput(!showLinkInput)}
+                    className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-pink-100 hover:text-pink-600 transition-colors shadow-sm"
+                    title="Add Link"
+                >
+                    <LinkIcon size={20} />
+                </button>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 bg-slate-900 text-white rounded-full hover:bg-pink-500 transition-colors shadow-lg"
+                    title="Upload File"
+                >
+                    <Plus size={20} />
+                </button>
+            </div>
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf,text/plain" onChange={(e) => handleFileUpload(e, false)} />
         </div>
+        
+        {/* Link Input Drawer */}
+        {showLinkInput && (
+            <div className="mb-4 bg-white p-2 rounded-xl border border-pink-200 shadow-sm flex gap-2 animate-in slide-in-from-top-2">
+                <input 
+                    type="text" 
+                    placeholder="Paste YouTube or Web URL..." 
+                    className="flex-1 text-sm outline-none px-2"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addLink()}
+                />
+                <button onClick={addLink} className="bg-pink-500 text-white px-3 py-1 rounded-lg text-xs font-bold">Add</button>
+            </div>
+        )}
+
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {files.length === 0 && (
                 <div className="text-slate-400 text-sm text-center mt-10 italic">No general assets uploaded.</div>
@@ -112,7 +159,8 @@ const ReferenceManager: React.FC<{
                 </button>
                 <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
-                    {file.type === 'image' && file.previewUrl ? <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" /> : <FileText className="text-slate-400" />}
+                    {file.type === 'image' && file.previewUrl ? <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" /> : 
+                     file.type === 'link' ? <Youtube className="text-red-500" /> : <FileText className="text-slate-400" />}
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
@@ -127,7 +175,7 @@ const ReferenceManager: React.FC<{
   );
 };
 
-// --- Settings Panel (Right Panel) ---
+// ... (SettingsPanel, getOverlayClasses, drawTextOverlayToCanvas remain same) ...
 const SettingsPanel: React.FC<{
   settings: ProjectSettings;
   setSettings: React.Dispatch<React.SetStateAction<ProjectSettings>>;
@@ -135,6 +183,23 @@ const SettingsPanel: React.FC<{
   return (
     <div className="h-full flex flex-col p-6 space-y-8 overflow-y-auto">
       <h2 className="text-2xl font-display font-bold text-slate-800">Studio Settings</h2>
+      
+      {/* PHASE 2: Project Mode Selector */}
+      <div className="space-y-3">
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Sparkles size={14} /> Project Mode</label>
+        <div className="grid grid-cols-2 gap-2">
+            {['Commercial', 'Music Video', 'Trippy', 'Cinematic'].map((mode) => (
+                <button
+                    key={mode}
+                    onClick={() => setSettings(prev => ({ ...prev, mode: mode as ProjectMode }))}
+                    className={`p-2 text-xs font-bold rounded-lg border-2 transition-all ${settings.mode === mode ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-100 text-slate-500 hover:border-slate-300'}`}
+                >
+                    {mode}
+                </button>
+            ))}
+        </div>
+      </div>
+
       <div className="space-y-3">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aspect Ratio</label>
         <div className="grid grid-cols-2 gap-3">
@@ -182,17 +247,11 @@ const SettingsPanel: React.FC<{
     </div>
   );
 };
-
-// --- Helper for Text Overlays ---
 const getOverlayClasses = (config?: OverlayConfig) => {
     const pos = config?.position || 'center';
     const size = config?.size || 'large';
-    
-    // Base classes (with responsive padding safe zones)
     let containerClasses = "absolute inset-0 pointer-events-none flex p-8 md:p-16 z-20 transition-all duration-500";
     let textClasses = "font-black text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] leading-tight";
-
-    // Position Mapping
     switch(pos) {
         case 'top-left': containerClasses += " items-start justify-start text-left"; break;
         case 'top-right': containerClasses += " items-start justify-end text-right"; break;
@@ -200,29 +259,20 @@ const getOverlayClasses = (config?: OverlayConfig) => {
         case 'bottom-right': containerClasses += " items-end justify-end text-right"; break;
         case 'top': containerClasses += " items-start justify-center text-center"; break;
         case 'bottom': containerClasses += " items-end justify-center text-center"; break;
-        case 'center': 
-        default: containerClasses += " items-center justify-center text-center"; break;
+        case 'center': default: containerClasses += " items-center justify-center text-center"; break;
     }
-
-    // Size Mapping (Relative to viewport)
-    // Toned down slightly to ensure it fits better on screens as per user feedback
     switch(size) {
         case 'small': textClasses += " text-lg md:text-2xl max-w-sm"; break;
         case 'medium': textClasses += " text-2xl md:text-4xl max-w-xl"; break;
         case 'xl': textClasses += " text-5xl md:text-7xl max-w-4xl"; break;
-        case 'large': 
-        default: textClasses += " text-3xl md:text-5xl max-w-3xl"; break;
+        case 'large': default: textClasses += " text-3xl md:text-5xl max-w-3xl"; break;
     }
-    
     return { containerClasses, textClasses };
 };
-
-// --- Canvas Drawing Helpers ---
 const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number, textAlign: CanvasTextAlign) => {
     const words = text.split(' ');
     let line = '';
     const lines = [];
-
     for (let n = 0; n < words.length; n++) {
         const testLine = line + words[n] + ' ';
         const metrics = ctx.measureText(testLine);
@@ -235,25 +285,16 @@ const wrapText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: num
         }
     }
     lines.push(line);
-    
     ctx.textAlign = textAlign;
     lines.forEach((l, i) => {
-        // Simple offset logic based on alignment to keep block together
         ctx.fillText(l.trim(), x, y + (i * lineHeight));
     });
 };
-
 const drawTextOverlayToCanvas = (ctx: CanvasRenderingContext2D, width: number, height: number, text: string, config?: OverlayConfig) => {
     if (!text) return;
-    
-    // Config Defaults
     const pos = config?.position || 'center';
     const size = config?.size || 'large';
-    
-    // Scale factor (assuming 720p base for calculations to be consistent with UI)
     const scale = width < height ? width / 720 : height / 720;
-    
-    // Font Setup
     let fontSize = 48;
     switch(size) {
         case 'small': fontSize = 24; break;
@@ -262,46 +303,27 @@ const drawTextOverlayToCanvas = (ctx: CanvasRenderingContext2D, width: number, h
         case 'large': default: fontSize = 48; break;
     }
     fontSize = fontSize * scale;
-    
     ctx.font = `900 ${fontSize}px "Outfit", sans-serif`;
     ctx.fillStyle = 'white';
     ctx.shadowColor = 'rgba(0,0,0,0.8)';
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 4;
-    
     const padding = 64 * scale;
     const lineHeight = fontSize * 1.2;
-    const maxWidth = width * 0.8; // Max 80% width
-
+    const maxWidth = width * 0.8;
     let x = width / 2;
     let y = height / 2;
     let align: CanvasTextAlign = 'center';
-
     switch(pos) {
-        case 'top-left': 
-            x = padding; y = padding + fontSize; align = 'left'; 
-            break;
-        case 'top-right': 
-            x = width - padding; y = padding + fontSize; align = 'right'; 
-            break;
-        case 'bottom-left': 
-            x = padding; y = height - padding - (lineHeight * 2); align = 'left'; 
-            break;
-        case 'bottom-right': 
-            x = width - padding; y = height - padding - (lineHeight * 2); align = 'right'; 
-            break;
-        case 'top': 
-            x = width / 2; y = padding + fontSize; align = 'center'; 
-            break;
-        case 'bottom': 
-            x = width / 2; y = height - padding - (lineHeight * 2); align = 'center'; 
-            break;
-        case 'center': default: 
-            x = width / 2; y = height / 2; align = 'center'; 
-            break;
+        case 'top-left': x = padding; y = padding + fontSize; align = 'left'; break;
+        case 'top-right': x = width - padding; y = padding + fontSize; align = 'right'; break;
+        case 'bottom-left': x = padding; y = height - padding - (lineHeight * 2); align = 'left'; break;
+        case 'bottom-right': x = width - padding; y = height - padding - (lineHeight * 2); align = 'right'; break;
+        case 'top': x = width / 2; y = padding + fontSize; align = 'center'; break;
+        case 'bottom': x = width / 2; y = height - padding - (lineHeight * 2); align = 'center'; break;
+        case 'center': default: x = width / 2; y = height / 2; align = 'center'; break;
     }
-
     wrapText(ctx, text, x, y, maxWidth, lineHeight, align);
 };
 
@@ -601,25 +623,30 @@ const ProjectBoard: React.FC<{
                             {project.currentPhase !== 'planning' && project.scenes.length > 0 ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
                             <span className="font-bold">Phase 1: Creative Brief & Storyboard</span>
                         </div>
+                        {/* Phase 1.5: Storyboarding (NEW) */}
+                        <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'storyboarding' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
+                             {(project.currentPhase !== 'planning' && project.currentPhase !== 'storyboarding') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                            <span className="font-bold">Phase 2: Storyboarding (Image Gen)</span>
+                        </div>
                         {/* Phase 2: Video */}
                         <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'video_production' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
                              {(project.currentPhase === 'voiceover' || project.currentPhase === 'scoring' || project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 2: Video Generation (Veo)</span>
+                            <span className="font-bold">Phase 3: Video Generation (Veo)</span>
                         </div>
                         {/* Phase 3: VO */}
                         <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'voiceover' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
                              {(project.currentPhase === 'scoring' || project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 3: Voiceover Recording (TTS)</span>
+                            <span className="font-bold">Phase 4: Voiceover Recording (TTS)</span>
                         </div>
                         {/* Phase 4: Scoring */}
                         <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'scoring' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
                              {(project.currentPhase === 'mixing' || project.currentPhase === 'ready') ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 4: Music Composition (Lyria)</span>
+                            <span className="font-bold">Phase 5: Music Composition (Lyria)</span>
                         </div>
                          {/* Phase 5: Mixing */}
                          <div className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${project.currentPhase === 'mixing' ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
                              {project.currentPhase === 'ready' ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                            <span className="font-bold">Phase 5: Final Mix & Stitch</span>
+                            <span className="font-bold">Phase 6: Final Mix & Stitch</span>
                         </div>
                     </div>
                 </div>
@@ -649,21 +676,36 @@ const ProjectBoard: React.FC<{
             }`}>
                 {/* Render ALL video elements stacked. Control Z-Index and Opacity */}
                 {project.scenes.map((scene, idx) => (
-                    <video
-                        key={scene.id}
-                        preload="auto"
-                        ref={(el) => { videoRefs.current[idx] = el; }}
-                        src={scene.videoUrl}
-                        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
-                        style={{ 
-                            opacity: idx === 0 ? 1 : 0,
-                            zIndex: idx === 0 ? 10 : 0
-                        }}
-                        muted // Muted as we use separate audio tracks
-                        playsInline
-                        loop // Loop individual clips so they don't freeze if timing is off by ms
-                        crossOrigin="anonymous" // Important for canvas capture if needed
-                    />
+                    <React.Fragment key={scene.id}>
+                        {/* Display Storyboard Image if Video is not ready yet */}
+                        {scene.storyboardUrl && !scene.videoUrl && (
+                            <img 
+                                src={scene.storyboardUrl}
+                                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
+                                style={{
+                                    opacity: idx === 0 ? 1 : 0, // Simplified preview logic for storyboards: just show first or overlay handled by sequencer
+                                    // Actually, let sequencer handle visibility if playing, but if not playing, show first?
+                                    // Better: If video doesn't exist, show image at correct index
+                                    zIndex: idx === 0 ? 5 : 0
+                                }}
+                            />
+                        )}
+                        
+                        <video
+                            preload="auto"
+                            ref={(el) => { videoRefs.current[idx] = el; }}
+                            src={scene.videoUrl}
+                            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out"
+                            style={{ 
+                                opacity: idx === 0 ? 1 : 0,
+                                zIndex: idx === 0 ? 10 : 0
+                            }}
+                            muted // Muted as we use separate audio tracks
+                            playsInline
+                            loop // Loop individual clips so they don't freeze if timing is off by ms
+                            crossOrigin="anonymous" // Important for canvas capture if needed
+                        />
+                    </React.Fragment>
                 ))}
 
                 {/* Overlays with Dynamic Positioning and Sizing */}
@@ -718,7 +760,10 @@ const ProjectBoard: React.FC<{
             </div>
 
             <div className="mt-6 w-full max-w-2xl text-center">
-                <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-800 mb-2">{project.title}</h1>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                    <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-800">{project.title}</h1>
+                    {project.mode && <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-1 rounded-full uppercase font-bold tracking-wider">{project.mode}</span>}
+                </div>
                 <p className="text-sm text-slate-600 max-w-lg mx-auto">{project.concept}</p>
             </div>
           </div>
@@ -732,7 +777,19 @@ const ProjectBoard: React.FC<{
                     <div className="flex items-center gap-2 text-pink-700 font-bold">
                         <Mic size={18} /> Master Voiceover
                     </div>
-                    <p className="text-xs text-slate-600 italic line-clamp-3">"{project.fullScript}"</p>
+                    {project.script && project.script.length > 0 ? (
+                        <div className="text-xs space-y-2 mt-1 h-32 overflow-y-auto pr-1">
+                             {project.script.map((line, i) => (
+                                 <div key={i} className="flex gap-2">
+                                     <span className="font-bold text-pink-800 shrink-0 w-16 text-right">{line.speaker}:</span>
+                                     <span className="text-slate-600">{line.text}</span>
+                                 </div>
+                             ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-slate-600 italic line-clamp-3">"{project.fullScript}"</p>
+                    )}
+                    
                     {project.voiceoverUrl ? (
                         <audio controls src={project.voiceoverUrl} className="w-full h-8 mt-2" crossOrigin="anonymous" onError={(e) => handleAudioError("Voice Master", e)} />
                     ) : (
@@ -757,9 +814,25 @@ const ProjectBoard: React.FC<{
                 {project.scenes.map((scene, idx) => (
                     <div key={scene.id} className="flex items-center gap-4 p-3 bg-white border border-slate-100 rounded-lg">
                         <div className="w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center text-xs font-bold">{idx + 1}</div>
-                        <div className="w-24 aspect-video bg-black rounded overflow-hidden">
-                             {scene.videoUrl && <video src={scene.videoUrl} className="w-full h-full object-cover" />}
+                        
+                        {/* Storyboard / Video Thumbnail */}
+                        <div className="w-24 aspect-video bg-black rounded overflow-hidden relative">
+                             {scene.videoUrl ? (
+                                <video src={scene.videoUrl} className="w-full h-full object-cover" />
+                             ) : scene.storyboardUrl ? (
+                                <>
+                                    <img src={scene.storyboardUrl} className="w-full h-full object-cover opacity-80" />
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <Loader2 className="animate-spin text-white w-6 h-6" />
+                                    </div>
+                                </>
+                             ) : (
+                                <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300">
+                                    <ImageIcon size={16} />
+                                </div>
+                             )}
                         </div>
+                        
                         <div className="flex-1">
                             <div className="text-xs font-bold text-slate-500 uppercase">Duration: {scene.duration}s</div>
                             <div className="text-sm text-slate-800 line-clamp-1">{scene.visualPrompt}</div>
@@ -781,9 +854,10 @@ const ProjectBoard: React.FC<{
   );
 }
 
-// --- Agent Chat ---
+// ... (AgentChat remains unchanged) ...
+// --- AgentChat ---
 const AgentChat: React.FC<{
-  onGenerate: (prompt: string) => void;
+  onGenerate: (prompt: string, attachments?: ChatAttachment[]) => void;
   isProcessing: boolean;
   project?: AdProject | null;
 }> = ({ onGenerate, isProcessing, project }) => {
@@ -791,26 +865,85 @@ const AgentChat: React.FC<{
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Hello! I am your AI Creative Director. Ready to produce your ad?', timestamp: Date.now() }]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          Array.from(e.target.files).forEach(file => {
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                  const base64 = (ev.target?.result as string).split(',')[1];
+                  const newAtt: ChatAttachment = {
+                      id: Date.now().toString() + Math.random(),
+                      type: file.type.startsWith('image') ? 'image' : 'video',
+                      url: URL.createObjectURL(file),
+                      mimeType: file.type,
+                      base64Data: base64
+                  };
+                  setPendingAttachments(prev => [...prev, newAtt]);
+              };
+              reader.readAsDataURL(file);
+          });
+      }
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const addLink = () => {
+    if (!linkUrl.trim()) return;
+    const newAtt: ChatAttachment = {
+        id: Date.now().toString() + Math.random(),
+        type: 'link',
+        url: linkUrl,
+        mimeType: 'text/uri-list',
+        base64Data: '' // No binary data for links
+    };
+    setPendingAttachments(prev => [...prev, newAtt]);
+    setLinkUrl('');
+    setShowLinkInput(false);
+  };
+
+  const removeAttachment = (id: string) => {
+      setPendingAttachments(prev => prev.filter(p => p.id !== id));
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
+    if (!input.trim() && pendingAttachments.length === 0) return;
     
-    if (input.toLowerCase().includes('create') || input.toLowerCase().includes('generate')) {
-        onGenerate(userMsg.text);
+    // Capture current state to send
+    const attachmentsToSend = [...pendingAttachments];
+    const textToSend = input;
+
+    // Reset Input UI immediately
+    setInput('');
+    setPendingAttachments([]);
+
+    const userMsg: ChatMessage = { 
+        id: Date.now().toString(), 
+        role: 'user', 
+        text: textToSend, 
+        timestamp: Date.now(),
+        attachments: attachmentsToSend 
+    };
+    setMessages(prev => [...prev, userMsg]);
+    
+    // Command Detection
+    if (textToSend.toLowerCase().includes('create') || textToSend.toLowerCase().includes('generate')) {
+        onGenerate(textToSend, attachmentsToSend);
     } else {
         setIsAnalyzing(true);
-        // Pass current project state (including video URLs) to the Chat Agent
-        // NOTE: If this is the first time we are discussing the project, the service will attach the videos.
         const response = await GeminiService.sendChatMessage(
-            messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })), 
-            userMsg.text,
-            project || undefined
+            messages.map(m => ({ role: m.role, parts: [{ text: m.text }] })), // History (simplified text for now)
+            textToSend,
+            project || undefined,
+            attachmentsToSend // Pass actual binary for this turn
         );
         setIsAnalyzing(false);
         setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: response, timestamp: Date.now() }]);
@@ -818,7 +951,7 @@ const AgentChat: React.FC<{
   };
 
   return (
-    <div className={`absolute bottom-4 right-4 md:bottom-8 md:right-8 z-50 transition-all duration-300 ${isOpen ? 'w-[calc(100vw-2rem)] md:w-96 h-[500px]' : 'w-16 h-16'}`}>
+    <div className={`absolute bottom-4 right-4 md:bottom-8 md:right-8 z-50 transition-all duration-300 ${isOpen ? 'w-[calc(100vw-2rem)] md:w-96 h-[600px]' : 'w-16 h-16'}`}>
       {!isOpen && <button onClick={() => setIsOpen(true)} className="w-16 h-16 rounded-full bg-slate-900 text-white shadow-2xl flex items-center justify-center hover:scale-110 transition-transform"><MessageSquare size={24} /></button>}
       {isOpen && (
         <div className="w-full h-full flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden ring-4 ring-slate-900/5">
@@ -827,16 +960,94 @@ const AgentChat: React.FC<{
             <button onClick={() => setIsOpen(false)} className="opacity-70 hover:opacity-100"><X size={18} /></button>
           </div>
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
-            {messages.map(msg => (<div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'}`}>{msg.text}</div></div>))}
+            {messages.map(msg => (
+                <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    {/* Render Attachments in History */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                        <div className={`flex gap-2 mb-1 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            {msg.attachments.map(att => (
+                                <div key={att.id} className="w-24 h-24 rounded-lg overflow-hidden border border-slate-200 shadow-sm relative flex items-center justify-center bg-slate-100">
+                                    {att.type === 'image' ? (
+                                        <img src={att.url} className="w-full h-full object-cover" />
+                                    ) : att.type === 'video' ? (
+                                        <video src={att.url} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-1 p-2 text-center">
+                                            <Youtube size={24} className="text-red-500" />
+                                            <span className="text-[10px] text-slate-500 leading-tight truncate w-full">{att.url}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-200 rounded-bl-none shadow-sm'}`}>{msg.text}</div>
+                </div>
+            ))}
             
             {/* Processing States */}
             {isProcessing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Loader2 className="animate-spin" size={12} />Producing Ad...</div></div>}
-            {isAnalyzing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Eye className="animate-pulse" size={12} />Analyzing Video Context...</div></div>}
+            {isAnalyzing && <div className="flex justify-start"><div className="bg-white p-3 rounded-2xl rounded-bl-none border border-slate-200 shadow-sm flex items-center gap-2 text-xs text-slate-500"><Eye className="animate-pulse" size={12} />Analyzing Context...</div></div>}
           </div>
-          <div className="p-3 bg-white border-t border-slate-100">
-            <div className="flex gap-2">
+          
+          <div className="p-3 bg-white border-t border-slate-100 space-y-2">
+            
+            {/* Attachment Preview Area */}
+            {pendingAttachments.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto py-2">
+                    {pendingAttachments.map(att => (
+                        <div key={att.id} className="relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border border-slate-200 group bg-slate-50 flex items-center justify-center">
+                            {att.type === 'image' ? <img src={att.url} className="w-full h-full object-cover" /> : 
+                             att.type === 'video' ? <video src={att.url} className="w-full h-full object-cover" /> :
+                             <Youtube className="text-red-500" />}
+                            <button onClick={() => removeAttachment(att.id)} className="absolute top-0 right-0 bg-black/50 text-white p-0.5 rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
+                        </div>
+                    ))}
+                </div>
+            )}
+            
+            {/* Link Input Drawer */}
+            {showLinkInput && (
+                <div className="flex gap-2 animate-in slide-in-from-bottom-2">
+                    <input 
+                        type="text" 
+                        placeholder="Paste URL..." 
+                        className="flex-1 bg-slate-100 text-slate-900 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-pink-500"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addLink()}
+                    />
+                    <button onClick={addLink} className="bg-slate-900 text-white px-3 rounded-lg text-xs font-bold">Add</button>
+                    <button onClick={() => setShowLinkInput(false)} className="bg-slate-200 text-slate-600 px-2 rounded-lg"><X size={14}/></button>
+                </div>
+            )}
+
+            <div className="flex gap-2 items-center">
+                 <button 
+                    onClick={() => setShowLinkInput(!showLinkInput)}
+                    className="p-2 text-slate-400 hover:text-red-500 transition-colors bg-slate-100 rounded-full hover:bg-pink-50"
+                    title="Attach Link"
+                >
+                    <LinkIcon size={18} />
+                </button>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-slate-400 hover:text-pink-500 transition-colors bg-slate-100 rounded-full hover:bg-pink-50"
+                    title="Attach Image or Video"
+                >
+                    <Paperclip size={18} />
+                </button>
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*,video/*,application/pdf" 
+                    multiple 
+                    onChange={handleFileSelect} 
+                />
+                
                 <input type="text" className="flex-1 bg-slate-100 text-slate-900 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-pink-500" placeholder="Type request..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} />
-                <button onClick={handleSend} className="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800"><ArrowUpCircle size={20} /></button>
+                <button onClick={handleSend} className="p-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 disabled:opacity-50" disabled={!input.trim() && pendingAttachments.length === 0}><ArrowUpCircle size={20} /></button>
             </div>
           </div>
         </div>
@@ -847,15 +1058,10 @@ const AgentChat: React.FC<{
 
 // --- Main App ---
 export function App() {
-  // Fix: Initialize with environment variable existence to support deployed environments.
-  // This allows the app to start immediately if API_KEY is set in build/deployment config.
   const [apiKeyReady, setApiKeyReady] = useState(!!process.env.API_KEY);
-  
   const [referenceFiles, setReferenceFiles] = useState<ReferenceFile[]>([]);
-  // Visual Anchor State
   const [visualAnchor, setVisualAnchor] = useState<ReferenceFile | null>(null);
-
-  const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine });
+  const [settings, setSettings] = useState<ProjectSettings>({ customScript: '', musicTheme: '', useTextOverlays: 'auto', preferredVoice: 'auto', aspectRatio: AspectRatio.SixteenNine, mode: 'Commercial' });
   const [project, setProject] = useState<AdProject | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showLeftPanel, setShowLeftPanel] = useState(false);
@@ -863,15 +1069,10 @@ export function App() {
 
   useEffect(() => {
     const initKey = async () => {
-        // If env var is already present, we are ready.
         if (process.env.API_KEY) return;
-
-        // Fallback for AI Studio (Veo) context
         if (window.aistudio) {
             const hasKey = await window.aistudio.hasSelectedApiKey();
-            if (hasKey) {
-                setApiKeyReady(true);
-            }
+            if (hasKey) setApiKeyReady(true);
         }
     };
     initKey();
@@ -881,58 +1082,92 @@ export function App() {
     if (window.aistudio) {
         await window.aistudio.openSelectKey();
         const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (hasKey) {
-             setApiKeyReady(true);
-        }
+        if (hasKey) setApiKeyReady(true);
     } else { 
-        alert("This app requires an API Key. If you are deploying this app, please add your Google AI Studio API Key as an environment variable named 'API_KEY' in your deployment settings."); 
+        alert("This app requires an API Key."); 
     }
   };
 
-  const handleGenerateProject = async (prompt: string) => {
+  const handleGenerateProject = async (prompt: string, chatAttachments?: ChatAttachment[]) => {
     setIsProcessing(true);
     try {
+        // Phase 3.5: Multimodal Injection
+        let effectiveReferences = [...referenceFiles];
+        
+        if (chatAttachments && chatAttachments.length > 0) {
+            const chatRefs: ReferenceFile[] = chatAttachments.map(att => ({
+                id: att.id,
+                name: att.type === 'link' ? att.url : `Chat Attachment (${att.type})`,
+                type: att.type === 'link' ? 'link' : 'image', // Maps chat types to ref types
+                content: att.type === 'link' ? att.url : `data:${att.mimeType};base64,${att.base64Data}`,
+                mimeType: att.mimeType,
+            }));
+            effectiveReferences = [...effectiveReferences, ...chatRefs];
+        }
+
         // Phase 1: Planning
-        const plan = await GeminiService.generateAdPlan(prompt, settings, referenceFiles);
+        const plan = await GeminiService.generateAdPlan(prompt, settings, effectiveReferences);
+        
         const newProject: AdProject = {
-            title: plan.title, concept: plan.concept, musicMood: plan.musicMood, fullScript: plan.fullScript,
+            title: plan.title, 
+            concept: plan.concept, 
+            musicMood: plan.musicMood, 
+            fullScript: plan.fullScript,
+            script: plan.script,
             scenes: plan.scenes.map((s: any) => ({ ...s, status: 'pending' })),
-            ffmpegCommand: plan.ffmpegCommand, isGenerating: true, currentPhase: 'planning',
-            visualAnchor: visualAnchor?.content // Store it in project for history/persistence
+            ffmpegCommand: plan.ffmpegCommand, 
+            isGenerating: true, 
+            currentPhase: 'planning',
+            visualAnchor: visualAnchor?.content,
+            mode: settings.mode
         };
         setProject(newProject);
 
-        // Phase 2: Video Production (Parallel scenes)
+        // Phase 1.5: Storyboarding (Generate Images First)
+        setProject(prev => prev ? ({...prev, currentPhase: 'storyboarding'}) : null);
+        const storybardedScenes = [...newProject.scenes];
+        
+        for (let i = 0; i < storybardedScenes.length; i++) {
+             // Generate Image Keyframe using Gemini 3 Pro Image (or 2.5 flash image via flag logic if we wanted speed, but high quality requested)
+             const imgUrl = await GeminiService.generateStoryboardImage(
+                storybardedScenes[i].visualPrompt,
+                settings.aspectRatio,
+                visualAnchor?.content // Enforce Character Consistency Here
+             );
+             storybardedScenes[i].storyboardUrl = imgUrl || undefined;
+             // Update project state so UI shows the image
+             setProject(prev => prev ? ({ ...prev, scenes: [...storybardedScenes] }) : null);
+        }
+
+        // Phase 2: Video Production (Image-to-Video)
         setProject(prev => prev ? ({...prev, currentPhase: 'video_production'}) : null);
-        const updatedScenes = [...newProject.scenes];
-        // Sequentially generate scenes to avoid rate limits in demo, but show as "Phase 2"
+        const updatedScenes = [...storybardedScenes];
         for (let i = 0; i < updatedScenes.length; i++) {
-            // PASS THE VISUAL ANCHOR IF AVAILABLE
+            // Use the Storyboard Image as input for Veo
             const videoUrl = await GeminiService.generateVideoClip(
                 updatedScenes[i].visualPrompt, 
                 settings.aspectRatio,
-                visualAnchor?.content // Pass base64 data to service
+                updatedScenes[i].storyboardUrl || visualAnchor?.content // Fallback to visual anchor if storyboard failed
             );
-            
             updatedScenes[i].videoUrl = videoUrl || undefined;
             updatedScenes[i].status = 'complete';
             setProject(prev => prev ? ({ ...prev, scenes: [...updatedScenes] }) : null);
         }
 
-        // Phase 3: Voiceover (Single Track)
+        // Phase 3: Voiceover
         setProject(prev => prev ? ({...prev, currentPhase: 'voiceover'}) : null);
         const voiceToUse = settings.preferredVoice !== 'auto' ? settings.preferredVoice : TTSVoice.Kore;
-        const voUrl = await GeminiService.generateVoiceover(plan.fullScript, voiceToUse as TTSVoice);
+        const voUrl = await GeminiService.generateVoiceover(plan.fullScript, voiceToUse as TTSVoice, plan.script);
         setProject(prev => prev ? ({...prev, voiceoverUrl: voUrl || undefined}) : null);
 
-        // Phase 4: Scoring (Single Track)
+        // Phase 4: Scoring
         setProject(prev => prev ? ({...prev, currentPhase: 'scoring'}) : null);
         const musicUrl = await GeminiService.generateMusic(plan.musicMood);
         setProject(prev => prev ? ({...prev, musicUrl: musicUrl || undefined}) : null);
 
         // Phase 5: Final Mix
         setProject(prev => prev ? ({...prev, currentPhase: 'mixing'}) : null);
-        await new Promise(r => setTimeout(r, 1000)); // Simulate stitch time
+        await new Promise(r => setTimeout(r, 1000));
         setProject(prev => prev ? ({...prev, currentPhase: 'ready', isGenerating: false}) : null);
 
     } catch (e) {
