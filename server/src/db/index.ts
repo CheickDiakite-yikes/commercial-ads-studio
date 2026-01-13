@@ -1,28 +1,46 @@
-import { Pool } from 'pg';
-import dotenv from 'dotenv';
-import fs from 'fs';
+import Database from 'better-sqlite3';
 import path from 'path';
 
-dotenv.config();
+// Create database file in server directory
+const dbPath = path.join(__dirname, '../../data/adstudio.db');
+const db = new Database(dbPath);
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false // Replit DB usually requires SSL but might have self-signed certs
-    }
-});
+// Initialize tables
+export const initDb = () => {
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      concept TEXT,
+      settings TEXT DEFAULT '{}',
+      current_phase TEXT DEFAULT 'planning',
+      music_url TEXT,
+      voiceover_url TEXT,
+      full_script TEXT,
+      music_mood TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
 
-export const query = (text: string, params?: any[]) => pool.query(text, params);
-
-export const initDb = async () => {
-    try {
-        const schemaPath = path.join(__dirname, 'schema.sql');
-        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-        await pool.query(schemaSql);
-        console.log("Database initialized successfully");
-    } catch (err) {
-        console.error("Error initializing database", err);
-    }
+    CREATE TABLE IF NOT EXISTS scenes (
+      id TEXT PRIMARY KEY,
+      project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+      order_index INTEGER NOT NULL,
+      duration INTEGER NOT NULL,
+      character TEXT,
+      environment TEXT,
+      camera TEXT,
+      action_blocking TEXT,
+      visual_summary_prompt TEXT,
+      text_overlay TEXT,
+      overlay_config TEXT,
+      storyboard_url TEXT,
+      video_url TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+    console.log('SQLite database initialized');
 };
 
-export default pool;
+export default db;

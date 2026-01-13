@@ -1,1 +1,51 @@
-node_modules
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment variables (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+*.env
+server/.env
+client/.env
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+server/data/
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Testing
+coverage/
+
+# Temporary files
+tmp/
+temp/

@@ -20,9 +20,7 @@ app.get('/health', (req, res) => {
     res.send('Server is running');
 });
 
-app.listen(PORT, async () => {
-    if (process.env.DATABASE_URL) {
-        await initDb();
-    }
+app.listen(PORT, () => {
+    initDb(); // Initialize SQLite database
     console.log(`Server running on port ${PORT}`);
 });
