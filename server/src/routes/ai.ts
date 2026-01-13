@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { generateAdPlan, generateStoryboardImage, generateVideoClip, generateVoiceover, sendChatMessage } from '../services/gemini';
+import { generateAdPlan, generateStoryboardImage, generateVideoClip, generateVoiceover, sendChatMessage, generateMusic } from '../services/gemini';
 
 const router = Router();
 
@@ -55,6 +55,17 @@ router.post('/generate/voiceover', async (req, res) => {
     } catch (error) {
         console.error('TTS error:', error);
         res.status(500).json({ error: 'Voiceover generation failed' });
+    }
+});
+
+router.post('/generate/music', async (req, res) => {
+    try {
+        const { mood, duration } = req.body;
+        const audioUrl = await generateMusic(mood, duration);
+        res.json({ url: audioUrl });
+    } catch (error) {
+        console.error('Music error:', error);
+        res.status(500).json({ error: 'Music generation failed' });
     }
 });
 

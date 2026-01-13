@@ -58,9 +58,14 @@ export const generateVoiceover = async (text: string, voice: TTSVoice, dialogue?
 };
 
 export const generateMusic = async (moodDescription: string, durationSeconds: number = 30): Promise<string | null> => {
-    // TODO: Implement music generation on backend
-    console.warn("Music generation temporarily disabled in architecture upgrade");
-    return null;
+    const response = await fetch(`${API_BASE}/generate/music`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mood: moodDescription, duration: durationSeconds })
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.url;
 };
 
 export const sendChatMessage = async (
@@ -78,3 +83,27 @@ export const sendChatMessage = async (
     const data = await response.json();
     return data.text;
 }
+
+// --- Project Persistence ---
+
+export const getProjects = async (): Promise<AdProject[]> => {
+    const response = await fetch(`${API_BASE}/projects`);
+    if (!response.ok) return [];
+    return response.json();
+};
+
+export const getProjectById = async (id: string): Promise<AdProject | null> => {
+    const response = await fetch(`${API_BASE}/projects/${id}`);
+    if (!response.ok) return null;
+    return response.json();
+};
+
+export const saveProject = async (project: AdProject): Promise<{ id: string, message: string }> => {
+    const response = await fetch(`${API_BASE}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project)
+    });
+    if (!response.ok) throw new Error('Failed to save project');
+    return response.json();
+};

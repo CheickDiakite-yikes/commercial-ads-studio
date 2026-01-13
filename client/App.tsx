@@ -1013,6 +1013,18 @@ export const App: React.FC = () => {
         setHasKey(true);
     }, []);
 
+    // Autosave Project
+    useEffect(() => {
+        if (project) {
+            const saveTimeout = setTimeout(() => {
+                ApiService.saveProject(project)
+                    .then(res => console.log('Project autosaved', res.id))
+                    .catch(err => console.error('Autosave failed', err));
+            }, 2000);
+            return () => clearTimeout(saveTimeout);
+        }
+    }, [project]);
+
     const handleGenerate = async (prompt: string, attachments?: ChatAttachment[]) => {
         setIsProcessing(true);
         try {

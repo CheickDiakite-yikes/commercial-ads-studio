@@ -151,7 +151,7 @@ export const generateAdPlan = async (
     referenceFiles: ReferenceFile[]
 ): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = "gemini-2.0-flash-exp";
+    const model = "gemini-3-pro-preview";
 
     const contentParts: any[] = [];
 
@@ -269,7 +269,7 @@ export const generateStoryboardImage = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: 'imagen-3.0-generate-002', // Updated to latest available
+            model: 'gemini-3-pro-image-preview',
             contents: [{ parts }],
             config: {
                 // @ts-ignore
@@ -297,7 +297,7 @@ const internalGenerateVideo = async (
 ): Promise<string | null> => {
     try {
         let requestPayload: any = {
-            model: 'veo-2.0-generate-preview-001', // Updated to likely available model
+            model: 'veo-3.1-fast-generate-preview',
             prompt: prompt,
             config: { numberOfVideos: 1, resolution: '720p', aspectRatio: aspect }
         };
@@ -389,7 +389,7 @@ export const generateVoiceover = async (text: string, voice: TTSVoice, dialogue?
         }
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text: promptContent }] }],
             config: config
         });
@@ -437,7 +437,7 @@ export const sendChatMessage = async (
     if (hasLinks) config.tools = [{ googleSearch: {} }];
 
     const chat = ai.chats.create({
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-3-pro-preview',
         history: history,
         config: config
     });
@@ -445,3 +445,30 @@ export const sendChatMessage = async (
     const result = await chat.sendMessage({ message: parts });
     return result.text;
 }
+
+export const generateMusic = async (mood: string, duration: number = 30): Promise<string | null> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    try {
+        const response = await ai.models.generateContent({
+            model: 'lyria-realtime-exp',
+            contents: [{ parts: [{ text: `Generate ${mood} music for ${duration} seconds.` }] }],
+            config: {
+                // @ts-ignore
+                responseModalities: [Modality.AUDIO]
+            }
+        });
+
+        // @ts-ignore
+        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
+            const pcmData = base64ToUint8Array(base64Audio);
+            // Assuming Lyria output is 44.1kHz Stereo (2 channels)
+            const wavBuffer = pcmToWavBuffer(pcmData, 44100, 2);
+            return `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
+        }
+        return null;
+    } catch (error) {
+        console.error("Music Generation Error", error);
+        return null;
+    }
+};
