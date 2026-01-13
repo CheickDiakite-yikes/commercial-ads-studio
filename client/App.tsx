@@ -55,12 +55,12 @@ const ReferenceManager: React.FC<{
     };
 
     return (
-        <div className="h-full flex flex-col p-6 space-y-8">
+        <div className="h-full flex flex-col p-6 space-y-8 custom-scrollbar">
             {/* Visual Anchor Section */}
             <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                        <User size={14} /> Visual Anchor
+                    <h2 className="text-sm font-bold text-violet-300/70 uppercase tracking-wider flex items-center gap-2">
+                        <User size={14} className="text-violet-400" /> Visual Anchor
                     </h2>
                     {visualAnchor && (
                         <button
@@ -77,8 +77,8 @@ const ReferenceManager: React.FC<{
                     className={`
                 relative h-40 rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden group
                 ${visualAnchor
-                            ? 'border-pink-500 bg-pink-50'
-                            : 'border-slate-300 hover:border-pink-400 hover:bg-white/50 bg-slate-50'}
+                            ? 'border-pink-500 bg-pink-500/10'
+                            : 'border-white/10 hover:border-pink-500/50 hover:bg-white/5 bg-black/20'}
             `}
                 >
                     <input type="file" ref={anchorInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
@@ -86,39 +86,39 @@ const ReferenceManager: React.FC<{
                     {visualAnchor ? (
                         <>
                             <img src={visualAnchor.previewUrl} alt="Anchor" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <span className="text-white font-bold text-sm">Change Anchor</span>
                             </div>
                         </>
                     ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/30 gap-2 group-hover:text-pink-400 transition-colors">
                             <ImagePlus size={32} />
                             <span className="text-xs font-bold text-center px-4">Upload Character or<br />Product Reference</span>
                         </div>
                     )}
                 </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
+                <p className="text-[10px] text-white/40 leading-tight">
                     This image will be used as a strict visual reference for <strong>every</strong> generated scene to ensure consistency.
                 </p>
             </div>
 
-            <hr className="border-slate-200" />
+            <div className="w-full h-px bg-white/10" />
 
             {/* General Assets Section */}
             <div className="flex-1 flex flex-col min-h-0">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-display font-bold text-slate-800">Assets</h2>
+                    <h2 className="text-2xl font-display font-bold text-white">Assets</h2>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setShowLinkInput(!showLinkInput)}
-                            className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-pink-100 hover:text-pink-600 transition-colors shadow-sm"
+                            className="p-2 bg-white/5 text-white/60 rounded-full hover:bg-pink-500 hover:text-white transition-all shadow-sm border border-white/10"
                             title="Add Link"
                         >
                             <LinkIcon size={20} />
                         </button>
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="p-2 bg-slate-900 text-white rounded-full hover:bg-pink-500 transition-colors shadow-lg"
+                            className="p-2 bg-white text-black rounded-full hover:bg-pink-500 hover:text-white transition-all shadow-lg hover:shadow-pink-500/50"
                             title="Upload File"
                         >
                             <Plus size={20} />
@@ -129,39 +129,39 @@ const ReferenceManager: React.FC<{
 
                 {/* Link Input Drawer */}
                 {showLinkInput && (
-                    <div className="mb-4 bg-white p-2 rounded-xl border border-pink-200 shadow-sm flex gap-2 animate-in slide-in-from-top-2">
+                    <div className="mb-4 bg-black/40 p-2 rounded-xl border border-pink-500/30 shadow-sm flex gap-2 animate-in slide-in-from-top-2 backdrop-blur-sm">
                         <input
                             type="text"
                             placeholder="Paste YouTube or Web URL..."
-                            className="flex-1 text-sm outline-none px-2"
+                            className="flex-1 text-sm outline-none px-2 bg-transparent text-white placeholder:text-white/20"
                             value={linkUrl}
                             onChange={(e) => setLinkUrl(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addLink()}
                         />
-                        <button onClick={addLink} className="bg-pink-500 text-white px-3 py-1 rounded-lg text-xs font-bold">Add</button>
+                        <button onClick={addLink} className="bg-pink-500 hover:bg-pink-400 text-white px-3 py-1 rounded-lg text-xs font-bold transition-colors">Add</button>
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
                     {files.length === 0 && (
-                        <div className="text-slate-400 text-sm text-center mt-10 italic">No general assets uploaded.</div>
+                        <div className="text-white/20 text-sm text-center mt-10 italic">No general assets uploaded.</div>
                     )}
                     {files.map(file => (
-                        <div key={file.id} className="memphis-card p-3 rounded-xl relative group">
+                        <div key={file.id} className="glass-panel p-3 rounded-xl relative group hover:bg-white/10 transition-colors border border-white/5">
                             <button
                                 onClick={() => setFiles(prev => prev.filter(f => f.id !== file.id))}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-400"
                             >
                                 <X size={12} />
                             </button>
                             <div className="flex items-center space-x-3">
-                                <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
+                                <div className="w-12 h-12 bg-black/30 rounded-lg flex items-center justify-center overflow-hidden border border-white/10">
                                     {file.type === 'image' && file.previewUrl ? <img src={file.previewUrl} alt={file.name} className="w-full h-full object-cover" /> :
-                                        file.type === 'link' ? <Youtube className="text-red-500" /> : <FileText className="text-slate-400" />}
+                                        file.type === 'link' ? <Youtube className="text-red-500" /> : <FileText className="text-white/40" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
-                                    <p className="text-xs text-slate-500 uppercase">{file.type}</p>
+                                    <p className="text-sm font-bold text-white/90 truncate">{file.name}</p>
+                                    <p className="text-xs text-white/40 uppercase">{file.type}</p>
                                 </div>
                             </div>
                         </div>
@@ -177,18 +177,18 @@ const SettingsPanel: React.FC<{
     setSettings: React.Dispatch<React.SetStateAction<ProjectSettings>>;
 }> = ({ settings, setSettings }) => {
     return (
-        <div className="h-full flex flex-col p-6 space-y-8 overflow-y-auto">
-            <h2 className="text-2xl font-display font-bold text-slate-800">Studio Settings</h2>
+        <div className="h-full flex flex-col p-6 space-y-8 overflow-y-auto custom-scrollbar">
+            <h2 className="text-2xl font-display font-bold text-white mb-2">Studio Settings</h2>
 
             {/* Project Mode Selector */}
             <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Sparkles size={14} /> Project Mode</label>
+                <label className="text-xs font-bold text-violet-300/70 uppercase tracking-wider flex items-center gap-2"><Sparkles size={14} className="text-violet-400" /> Project Mode</label>
                 <div className="grid grid-cols-2 gap-2">
                     {['Commercial', 'Music Video', 'Trippy', 'Cinematic'].map((mode) => (
                         <button
                             key={mode}
                             onClick={() => setSettings(prev => ({ ...prev, mode: mode as ProjectMode }))}
-                            className={`p-2 text-xs font-bold rounded-lg border-2 transition-all ${settings.mode === mode ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-100 text-slate-500 hover:border-slate-300'}`}
+                            className={`p-2 text-xs font-bold rounded-lg border transition-all ${settings.mode === mode ? 'border-purple-500/50 bg-purple-500/20 text-purple-200 shadow-[0_0_10px_rgba(168,85,247,0.3)]' : 'border-white/10 text-white/40 hover:border-white/30 hover:bg-white/5'}`}
                         >
                             {mode}
                         </button>
@@ -197,13 +197,13 @@ const SettingsPanel: React.FC<{
             </div>
 
             <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Aspect Ratio</label>
+                <label className="text-xs font-bold text-rose-300/70 uppercase tracking-wider flex items-center gap-2"><Film size={14} className="text-rose-400" /> Aspect Ratio</label>
                 <div className="grid grid-cols-2 gap-3">
                     {(Object.values(AspectRatio) as AspectRatio[]).map(ratio => (
                         <button
                             key={ratio}
                             onClick={() => setSettings(prev => ({ ...prev, aspectRatio: ratio }))}
-                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all ${settings.aspectRatio === ratio ? 'border-pink-500 bg-pink-50 text-pink-600 shadow-[2px_2px_0px_0px_rgba(236,72,153,1)]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                            className={`p-3 rounded-xl border font-bold text-sm transition-all ${settings.aspectRatio === ratio ? 'border-pink-500/50 bg-pink-500/20 text-pink-200 shadow-[0_0_15px_rgba(236,72,153,0.3)]' : 'border-white/10 text-white/40 hover:border-white/30 hover:bg-white/5'}`}
                         >
                             {ratio}
                         </button>
@@ -211,34 +211,34 @@ const SettingsPanel: React.FC<{
                 </div>
             </div>
             <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Mic size={14} /> Voice</label>
+                <label className="text-xs font-bold text-sky-300/70 uppercase tracking-wider flex items-center gap-2"><Mic size={14} className="text-sky-400" /> Voice</label>
                 <select
-                    className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 focus:border-pink-500 outline-none"
+                    className="w-full p-3 rounded-xl border border-white/10 bg-black/40 text-white focus:border-pink-500/50 outline-none appearance-none"
                     value={settings.preferredVoice}
                     onChange={(e) => setSettings(prev => ({ ...prev, preferredVoice: e.target.value as TTSVoice | 'auto' }))}
                 >
-                    <option value="auto">Let AI Decide</option>
-                    {Object.values(TTSVoice).map(voice => <option key={voice} value={voice}>{voice}</option>)}
+                    <option value="auto" className="bg-slate-900">Let AI Decide</option>
+                    {Object.values(TTSVoice).map(voice => <option key={voice} value={voice} className="bg-slate-900">{voice}</option>)}
                 </select>
             </div>
             <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Layers size={14} /> Text Overlays</label>
-                <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+                <label className="text-xs font-bold text-amber-300/70 uppercase tracking-wider flex items-center gap-2"><Layers size={14} className="text-amber-400" /> Text Overlays</label>
+                <div className="flex gap-2 p-1 bg-white/5 rounded-lg border border-white/10">
                     {['yes', 'auto', 'no'].map((opt) => (
-                        <button key={opt} onClick={() => setSettings(prev => ({ ...prev, useTextOverlays: opt as any }))} className={`flex-1 py-2 text-xs font-bold rounded-md capitalize ${settings.useTextOverlays === opt ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>{opt}</button>
+                        <button key={opt} onClick={() => setSettings(prev => ({ ...prev, useTextOverlays: opt as any }))} className={`flex-1 py-2 text-xs font-bold rounded-md capitalize transition-all ${settings.useTextOverlays === opt ? 'bg-white/10 text-white shadow-sm border border-white/10' : 'text-white/30 hover:text-white/60'}`}>{opt}</button>
                     ))}
                 </div>
                 {settings.useTextOverlays !== 'no' && (
-                    <input type="text" placeholder="Preferred Font (Optional)" className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm" value={settings.textOverlayFont || ''} onChange={(e) => setSettings(prev => ({ ...prev, textOverlayFont: e.target.value }))} />
+                    <input type="text" placeholder="Preferred Font (Optional)" className="w-full p-3 rounded-xl border border-white/10 bg-black/20 text-white text-sm focus:border-pink-500/50 outline-none placeholder:text-white/20" value={settings.textOverlayFont || ''} onChange={(e) => setSettings(prev => ({ ...prev, textOverlayFont: e.target.value }))} />
                 )}
             </div>
             <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Music size={14} /> Music Theme</label>
-                <input type="text" placeholder="e.g., Upbeat..." className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm" value={settings.musicTheme} onChange={(e) => setSettings(prev => ({ ...prev, musicTheme: e.target.value }))} />
+                <label className="text-xs font-bold text-fuchsia-300/70 uppercase tracking-wider flex items-center gap-2"><Music size={14} className="text-fuchsia-400" /> Music Theme</label>
+                <input type="text" placeholder="e.g., Upbeat..." className="w-full p-3 rounded-xl border border-white/10 bg-black/20 text-white text-sm focus:border-pink-500/50 outline-none placeholder:text-white/20" value={settings.musicTheme} onChange={(e) => setSettings(prev => ({ ...prev, musicTheme: e.target.value }))} />
             </div>
             <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><FileText size={14} /> Custom Script</label>
-                <textarea placeholder="Enter lines..." className="w-full p-3 rounded-xl border-2 border-slate-200 bg-white/50 text-sm h-32 resize-none" value={settings.customScript} onChange={(e) => setSettings(prev => ({ ...prev, customScript: e.target.value }))} />
+                <label className="text-xs font-bold text-emerald-300/70 uppercase tracking-wider flex items-center gap-2"><FileText size={14} className="text-emerald-400" /> Custom Script</label>
+                <textarea placeholder="Enter lines..." className="w-full p-3 rounded-xl border border-white/10 bg-black/20 text-white text-sm h-32 resize-none focus:border-pink-500/50 outline-none placeholder:text-white/20" value={settings.customScript} onChange={(e) => setSettings(prev => ({ ...prev, customScript: e.target.value }))} />
             </div>
         </div>
     );
@@ -525,30 +525,55 @@ const ProjectBoard: React.FC<{
     const canvasH = settings.aspectRatio === AspectRatio.SixteenNine ? 720 : 1280;
 
     return (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col text-white">
             <canvas ref={canvasRef} width={canvasW} height={canvasH} className="hidden absolute pointer-events-none" />
 
-            <div className="flex border-b border-white/40 bg-white/10 backdrop-blur-sm">
-                <button onClick={() => setActiveTab('output')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'output' ? 'text-pink-600 border-b-2 border-pink-500 bg-pink-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Final Output</button>
-                <button onClick={() => setActiveTab('ingredients')} className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'ingredients' ? 'text-teal-600 border-b-2 border-teal-500 bg-teal-50/50' : 'text-slate-500 hover:text-slate-700'}`}>Director's View</button>
+            {/* Glowing Tabs */}
+            <div className="flex border-b border-white/10 relative">
+                <div className="absolute bottom-0 left-0 h-[1px] w-full bg-gradient-to-r from-transparent via-pink-500/50 to-transparent" />
+                <button
+                    onClick={() => setActiveTab('output')}
+                    className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all duration-300 relative
+                    ${activeTab === 'output' ? 'text-white' : 'text-white/40 hover:text-white/70'}
+                    `}
+                >
+                    Final Output
+                    {activeTab === 'output' && (
+                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-pink-500 shadow-[0_0_10px_#ec4899]" />
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('ingredients')}
+                    className={`flex-1 py-4 text-sm font-bold uppercase tracking-wider transition-all duration-300 relative
+                    ${activeTab === 'ingredients' ? 'text-white' : 'text-white/40 hover:text-white/70'}
+                    `}
+                >
+                    Director's View
+                    {activeTab === 'ingredients' && (
+                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-teal-500 shadow-[0_0_10px_#14b8a6]" />
+                    )}
+                </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 relative">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 relative custom-scrollbar">
+                {/* Generating Loading State */}
                 {project.isGenerating && (
-                    <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
+                    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center rounded-3xl border border-white/10 m-4">
                         <div className="max-w-md w-full space-y-6">
-                            <Loader2 className="animate-spin text-pink-500 mx-auto" size={48} />
-                            <h3 className="text-2xl font-display font-bold text-slate-900">Production In Progress</h3>
-                            <div className="space-y-4">
-                                {/* Status indicators */}
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-pink-500/20 blur-xl rounded-full" />
+                                <Loader2 className="animate-spin text-pink-400 relative z-10 mx-auto" size={48} />
+                            </div>
+                            <h3 className="text-2xl font-display font-bold text-white tracking-tight">Production In Progress</h3>
+                            <div className="space-y-3">
                                 {['planning', 'storyboarding', 'video_production', 'voiceover', 'scoring', 'mixing', 'ready'].map((phase, i) => {
                                     const labels: any = { planning: 'Creative Brief', storyboarding: 'Storyboards', video_production: 'Video Generation', voiceover: 'Voice Recording', scoring: 'Music Composition', mixing: 'Final Mix', ready: 'Ready' };
                                     const isActive = project.currentPhase === phase;
                                     const isDone = ['planning', 'storyboarding', 'video_production', 'voiceover', 'scoring', 'mixing', 'ready'].indexOf(project.currentPhase) > i;
                                     return (
-                                        <div key={phase} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${isActive ? 'bg-pink-100 text-pink-900' : 'text-slate-400'}`}>
-                                            {isDone ? <CheckCircle2 className="text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
-                                            <span className="font-bold">{labels[phase]}</span>
+                                        <div key={phase} className={`flex items-center gap-3 p-3 rounded-xl transition-all border ${isActive ? 'bg-pink-500/10 border-pink-500/30 text-white' : 'bg-transparent border-transparent text-white/30'}`}>
+                                            {isDone ? <CheckCircle2 className="text-green-400" size={20} /> : <div className={`w-5 h-5 rounded-full border-2 ${isActive ? 'border-pink-500 animate-pulse' : 'border-white/10'}`} />}
+                                            <span className="font-medium text-sm">{labels[phase]}</span>
                                         </div>
                                     )
                                 })}
@@ -557,60 +582,82 @@ const ProjectBoard: React.FC<{
                     </div>
                 )}
 
+                {/* Exporting Loading State */}
                 {isExporting && (
                     <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center text-white">
                         <Loader2 className="animate-spin text-pink-500 mx-auto mb-4" size={48} />
                         <h3 className="text-2xl font-display font-bold">Rendering Final Mix...</h3>
-                        <p className="text-slate-400 mt-2">Recording realtime playback. Do not close tab.</p>
-                        <div className="mt-4 font-mono text-xl">{formatTime(currentTime)} / {formatTime(totalDuration)}</div>
+                        <div className="mt-4 font-mono text-xl text-pink-400">{formatTime(currentTime)} / {formatTime(totalDuration)}</div>
                     </div>
                 )}
 
                 {activeTab === 'output' ? (
-                    <div className="flex flex-col items-center h-full">
+                    <div className="flex flex-col items-center h-full max-w-5xl mx-auto">
                         {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 0.3; }} />}
                         {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 1.0; }} />}
 
-                        <div className={`relative bg-black rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 border border-slate-800 ${settings.aspectRatio === '16:9' ? 'w-full aspect-video' : 'h-[50vh] md:h-[600px] aspect-[9/16]'
-                            }`}>
-                            {project.scenes.map((scene, idx) => (
-                                <React.Fragment key={scene.id}>
-                                    {scene.storyboardUrl && !scene.videoUrl && (
-                                        <img src={scene.storyboardUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out" style={{ opacity: idx === 0 ? 1 : 0, zIndex: idx === 0 ? 5 : 0 }} />
-                                    )}
-                                    <video preload="auto" ref={(el) => { videoRefs.current[idx] = el; }} src={scene.videoUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out" style={{ opacity: idx === 0 ? 1 : 0, zIndex: idx === 0 ? 10 : 0 }} muted playsInline loop crossOrigin="anonymous" />
-                                </React.Fragment>
-                            ))}
-                            <div className={containerClasses}><h2 className={textClasses}>{activeScene?.textOverlay}</h2></div>
+                        {/* Title Section */}
+                        <div className="text-center mb-6 space-y-2">
+                            <h2 className="text-3xl md:text-4xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/70 drop-shadow-sm">
+                                {project.title}
+                            </h2>
+                            <div className="flex items-center justify-center gap-2 text-sm text-pink-200/60 font-medium tracking-wide uppercase">
+                                <span>{project.mode || 'Commercial'}</span>
+                                <span className="w-1 h-1 rounded-full bg-pink-500" />
+                                <span>{formatTime(totalDuration)}</span>
+                            </div>
                         </div>
 
-                        <div className="w-full mt-4 bg-white border border-slate-200 rounded-2xl p-3 md:p-4 shadow-xl flex flex-col md:flex-row items-center gap-4 z-10 max-w-4xl">
-                            <div className="flex items-center gap-4 w-full md:w-auto">
-                                <button onClick={() => setIsPlaying(!isPlaying)} disabled={isExporting} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-slate-900 rounded-full text-white hover:bg-pink-500 transition-all shadow-md shrink-0 disabled:opacity-50">
-                                    {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
-                                </button>
-                                <div className="flex flex-col">
-                                    <span className="font-mono text-sm font-bold text-slate-700">{formatTime(currentTime)} <span className="text-slate-400">/ {formatTime(totalDuration)}</span></span>
-                                    <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Preview</span>
+                        {/* Device Frame / Player */}
+                        <div className={`relative p-2 rounded-3xl glass-panel shadow-2xl transition-all duration-500
+                            ${settings.aspectRatio === '16:9' ? 'w-full aspect-video max-w-4xl' : 'h-[60vh] md:h-[650px] aspect-[9/16]'}
+                        `}>
+                            {/* Glossy Reflection overlay */}
+                            <div className="absolute inset-0 rounded-2xl bg-gradient-to-tr from-white/10 to-transparent pointer-events-none z-20" />
+
+                            <div className="relative w-full h-full rounded-2xl overflow-hidden bg-black ring-1 ring-white/10">
+                                {project.scenes.map((scene, idx) => (
+                                    <React.Fragment key={scene.id}>
+                                        {scene.storyboardUrl && !scene.videoUrl && (
+                                            <img src={scene.storyboardUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out" style={{ opacity: idx === 0 ? 1 : 0, zIndex: idx === 0 ? 5 : 0 }} />
+                                        )}
+                                        <video preload="auto" ref={(el) => { videoRefs.current[idx] = el; }} src={scene.videoUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out" style={{ opacity: idx === 0 ? 1 : 0, zIndex: idx === 0 ? 10 : 0 }} muted playsInline loop crossOrigin="anonymous" />
+                                    </React.Fragment>
+                                ))}
+                                <div className={containerClasses}><h2 className={textClasses}>{activeScene?.textOverlay}</h2></div>
+                            </div>
+                        </div>
+
+                        {/* Control Bar (Glassmorphism Pill) */}
+                        <div className="w-full mt-8 glass-panel rounded-2xl p-4 flex flex-col items-center gap-4 z-10 max-w-2xl backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]">
+                            {/* Scrubber */}
+                            <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden relative group cursor-pointer hover:h-3 transition-all">
+                                <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-purple-600 shadow-[0_0_15px_#ec4899] transition-all duration-100 ease-linear" style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }} />
+                            </div>
+
+                            <div className="w-full flex items-center justify-between px-2">
+                                <span className="font-mono text-xs font-bold text-white/50">{formatTime(currentTime)}</span>
+
+                                <div className="flex items-center gap-6">
+                                    <button onClick={() => setCurrentTime(0)} className="text-white/50 hover:text-white transition-colors"><Layers size={20} className="rotate-180" /></button>
+
+                                    <button
+                                        onClick={() => setIsPlaying(!isPlaying)}
+                                        disabled={isExporting}
+                                        className="w-14 h-14 flex items-center justify-center bg-gradient-to-tr from-pink-500 to-purple-600 rounded-full text-white hover:shadow-[0_0_20px_rgba(236,72,153,0.5)] hover:scale-105 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                                    </button>
+
+                                    <button onClick={handleExport} disabled={isExporting} className="text-white/50 hover:text-white transition-colors">
+                                        <Download size={20} />
+                                    </button>
                                 </div>
+
+                                <span className="font-mono text-xs font-bold text-white/50">{formatTime(totalDuration)}</span>
                             </div>
-                            <div className="flex-1 w-full h-2 bg-slate-100 rounded-full overflow-hidden relative group cursor-pointer">
-                                <div className="absolute top-0 left-0 h-full bg-slate-200 w-full" />
-                                <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-pink-500 to-orange-400 transition-all duration-100 ease-linear" style={{ width: `${totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0}%` }} />
-                            </div>
-                            <button onClick={handleExport} disabled={isExporting || isPlaying} className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" title="Render & Download">
-                                {isExporting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
-                                <span>{isExporting ? 'Rendering...' : 'Download'}</span>
-                            </button>
                         </div>
 
-                        <div className="mt-6 w-full max-w-2xl text-center">
-                            <div className="flex items-center justify-center gap-2 mb-2">
-                                <h1 className="text-2xl md:text-3xl font-display font-bold text-slate-800">{project.title}</h1>
-                                {project.mode && <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-1 rounded-full uppercase font-bold tracking-wider">{project.mode}</span>}
-                            </div>
-                            <p className="text-sm text-slate-600 max-w-lg mx-auto">{project.concept}</p>
-                        </div>
                     </div>
                 ) : (
                     <div className="space-y-6">
@@ -652,46 +699,46 @@ const ProjectBoard: React.FC<{
                                         {/* INGREDIENTS */}
                                         <div className="md:col-span-8 lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {/* Camera Card */}
-                                            <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl">
-                                                <div className="flex items-center gap-2 text-blue-700 font-bold text-xs uppercase tracking-wider mb-2">
-                                                    <Camera size={14} /> Camera
+                                            <div className="glass-panel p-3 rounded-xl hover:bg-sky-500/10 transition-colors border border-sky-500/20">
+                                                <div className="flex items-center gap-2 text-sky-300 font-bold text-xs uppercase tracking-wider mb-2">
+                                                    <Camera size={14} className="text-sky-400" /> Camera
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs text-slate-700"><span className="font-bold">Framing:</span> {scene.camera.framing}</p>
-                                                    <p className="text-xs text-slate-700"><span className="font-bold">Move:</span> {scene.camera.movement}</p>
+                                                    <p className="text-xs text-white/70"><span className="font-bold text-sky-200">Framing:</span> {scene.camera.framing}</p>
+                                                    <p className="text-xs text-white/70"><span className="font-bold text-sky-200">Move:</span> {scene.camera.movement}</p>
                                                 </div>
                                             </div>
 
                                             {/* Lighting Card */}
-                                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl">
-                                                <div className="flex items-center gap-2 text-amber-700 font-bold text-xs uppercase tracking-wider mb-2">
-                                                    <Sun size={14} /> Lighting & Env
+                                            <div className="glass-panel p-3 rounded-xl hover:bg-amber-500/10 transition-colors border border-amber-500/20">
+                                                <div className="flex items-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-wider mb-2">
+                                                    <Sun size={14} className="text-amber-400" /> Lighting & Env
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs text-slate-700"><span className="font-bold">Light:</span> {scene.environment.lighting}</p>
-                                                    <p className="text-xs text-slate-700"><span className="font-bold">Loc:</span> {scene.environment.location}</p>
+                                                    <p className="text-xs text-white/70"><span className="font-bold text-amber-200">Light:</span> {scene.environment.lighting}</p>
+                                                    <p className="text-xs text-white/70"><span className="font-bold text-amber-200">Loc:</span> {scene.environment.location}</p>
                                                 </div>
                                             </div>
 
                                             {/* Wardrobe Card */}
-                                            <div className="bg-purple-50 border border-purple-100 p-3 rounded-xl">
-                                                <div className="flex items-center gap-2 text-purple-700 font-bold text-xs uppercase tracking-wider mb-2">
-                                                    <Shirt size={14} /> Character
+                                            <div className="glass-panel p-3 rounded-xl hover:bg-violet-500/10 transition-colors border border-violet-500/20">
+                                                <div className="flex items-center gap-2 text-violet-300 font-bold text-xs uppercase tracking-wider mb-2">
+                                                    <Shirt size={14} className="text-violet-400" /> Character
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-xs text-slate-700 line-clamp-2">{scene.character.description}</p>
-                                                    <p className="text-[10px] text-purple-600 font-mono mt-1 bg-purple-100/50 p-1 rounded">
+                                                    <p className="text-xs text-white/70 line-clamp-2">{scene.character.description}</p>
+                                                    <p className="text-[10px] text-violet-300 font-mono mt-1 bg-violet-500/20 p-1 rounded inline-block border border-violet-500/30">
                                                         Wearing: {scene.character.wardrobe}
                                                     </p>
                                                 </div>
                                             </div>
 
                                             {/* Action Card */}
-                                            <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
-                                                <div className="flex items-center gap-2 text-slate-700 font-bold text-xs uppercase tracking-wider mb-2">
-                                                    <Video size={14} /> Action Blocking
+                                            <div className="glass-panel p-3 rounded-xl hover:bg-emerald-500/10 transition-colors border border-emerald-500/20">
+                                                <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs uppercase tracking-wider mb-2">
+                                                    <Video size={14} className="text-emerald-400" /> Action Blocking
                                                 </div>
-                                                <ul className="text-xs text-slate-600 list-disc list-inside space-y-1">
+                                                <ul className="text-xs text-white/60 list-disc list-inside space-y-1">
                                                     {scene.action_blocking.map((action, i) => (
                                                         <li key={i}>{action.notes}</li>
                                                     ))}
@@ -705,7 +752,7 @@ const ProjectBoard: React.FC<{
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
 
@@ -831,38 +878,38 @@ const AgentChat: React.FC<{
     return (
         <div className={`
         fixed bottom-0 right-0 w-full lg:w-96 lg:right-6 lg:bottom-6 
-        bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl border border-slate-200 z-[100] 
-        flex flex-col overflow-hidden transition-all duration-300 ease-in-out
-        ${isOpen ? 'h-[60vh] lg:h-[600px]' : 'h-14'}
+        glass-panel z-[100] 
+        flex flex-col overflow-hidden transition-all duration-300 ease-in-out border border-white/20 shadow-2xl
+        ${isOpen ? 'h-[60vh] lg:h-[600px] rounded-t-2xl lg:rounded-2xl' : 'h-14 rounded-t-xl lg:rounded-xl'}
     `}>
             {/* Header */}
             <div
-                className="p-4 bg-slate-900 text-white flex justify-between items-center cursor-pointer hover:bg-slate-800 transition-colors"
+                className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex justify-between items-center cursor-pointer hover:saturate-150 transition-all border-b border-white/10"
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                    <span className="font-bold text-sm">AI Creative Director</span>
+                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_10px_#4ade80]" />
+                    <span className="font-bold text-sm tracking-wide">AI Creative Director</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {isProcessing && <Loader2 size={16} className="animate-spin text-pink-500" />}
+                    {isProcessing && <Loader2 size={16} className="animate-spin text-white" />}
                     {isOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/40 custom-scrollbar">
                 {messages.map(msg => (
                     <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'}`}>
+                        <div className={`max-w-[85%] p-3 rounded-2xl text-sm box-shadow-md backdrop-blur-md ${msg.role === 'user' ? 'bg-pink-500 text-white rounded-tr-none shadow-[0_4px_15px_rgba(236,72,153,0.3)]' : 'bg-white/10 border border-white/10 text-white/90 rounded-tl-none'}`}>
                             {msg.attachments && msg.attachments.length > 0 && (
-                                <div className="mb-2 flex gap-2 overflow-x-auto">
+                                <div className="mb-2 flex gap-2 overflow-x-auto custom-scrollbar pb-1">
                                     {msg.attachments.map(att => (
                                         <div key={att.id} className="relative group shrink-0">
                                             {att.type === 'image' ? (
                                                 <img src={att.url} className="w-16 h-16 object-cover rounded-lg border border-white/20" />
                                             ) : (
-                                                <div className="w-16 h-16 rounded-lg bg-slate-100 flex items-center justify-center text-red-500">
+                                                <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center text-red-400 border border-white/10">
                                                     <Youtube size={24} />
                                                 </div>
                                             )}
@@ -871,13 +918,13 @@ const AgentChat: React.FC<{
                                 </div>
                             )}
                             {msg.isThinking ? (
-                                <div className="flex gap-1 items-center">
-                                    <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" />
-                                    <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-75" />
-                                    <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce delay-150" />
+                                <div className="flex gap-1 items-center px-1">
+                                    <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce" />
+                                    <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce delay-75" />
+                                    <div className="w-1.5 h-1.5 bg-white/60 rounded-full animate-bounce delay-150" />
                                 </div>
                             ) : (
-                                <p className="whitespace-pre-wrap">{msg.text}</p>
+                                <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                             )}
                         </div>
                     </div>
@@ -886,28 +933,28 @@ const AgentChat: React.FC<{
             </div>
 
             {/* Input Area */}
-            <div className="p-3 bg-white border-t border-slate-200">
+            <div className="p-3 bg-white/5 border-t border-white/10 backdrop-blur-xl">
                 {showLinkInput && (
                     <div className="flex gap-2 mb-2 animate-in slide-in-from-bottom-2">
                         <input
                             type="text"
                             placeholder="Paste YouTube or Web URL..."
-                            className="flex-1 bg-slate-100 text-slate-900 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-pink-500"
+                            className="flex-1 bg-black/40 text-white rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-pink-500 border border-white/10"
                             value={linkUrl}
                             onChange={(e) => setLinkUrl(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addLink()}
                         />
-                        <button onClick={addLink} className="bg-slate-900 text-white px-3 rounded-lg text-xs font-bold">Add</button>
-                        <button onClick={() => setShowLinkInput(false)} className="bg-slate-200 text-slate-600 px-2 rounded-lg"><X size={14} /></button>
+                        <button onClick={addLink} className="bg-pink-500 text-white px-3 rounded-lg text-xs font-bold hover:bg-pink-400">Add</button>
+                        <button onClick={() => setShowLinkInput(false)} className="bg-white/10 text-white/60 px-2 rounded-lg hover:text-white"><X size={14} /></button>
                     </div>
                 )}
 
                 {attachments.length > 0 && (
-                    <div className="flex gap-2 mb-2 px-2">
+                    <div className="flex gap-2 mb-2 px-2 overflow-x-auto custom-scrollbar">
                         {attachments.map(att => (
-                            <div key={att.id} className="relative group">
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 flex items-center justify-center">
-                                    {att.type === 'image' ? <img src={att.url} className="w-full h-full object-cover" /> : <LinkIcon size={16} className="text-slate-400" />}
+                            <div key={att.id} className="relative group shrink-0">
+                                <div className="w-10 h-10 rounded-lg bg-black/40 overflow-hidden border border-white/10 flex items-center justify-center">
+                                    {att.type === 'image' ? <img src={att.url} className="w-full h-full object-cover" /> : <LinkIcon size={16} className="text-white/60" />}
                                 </div>
                                 <button onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10} /></button>
                             </div>
@@ -915,16 +962,16 @@ const AgentChat: React.FC<{
                     </div>
                 )}
                 <div className="flex items-center gap-2">
-                    <button onClick={() => setShowLinkInput(!showLinkInput)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 rounded-full transition-colors">
+                    <button onClick={() => setShowLinkInput(!showLinkInput)} className="p-2 text-white/50 hover:text-pink-400 hover:bg-white/10 rounded-full transition-colors">
                         <LinkIcon size={20} />
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-white/50 hover:text-pink-400 hover:bg-white/10 rounded-full transition-colors">
                         <Paperclip size={20} />
                     </button>
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAttachment} />
 
                     <input
-                        className="flex-1 bg-slate-100 text-slate-900 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-pink-500 outline-none"
+                        className="flex-1 bg-black/40 text-white border border-white/10 rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none placeholder:text-white/30 transition-all font-medium"
                         placeholder="Describe your ad..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
@@ -934,7 +981,7 @@ const AgentChat: React.FC<{
                     <button
                         onClick={handleSend}
                         disabled={(!input && attachments.length === 0) || isProcessing}
-                        className="p-2 bg-pink-500 text-white rounded-full hover:bg-pink-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                        className="p-2 bg-gradient-to-tr from-pink-500 to-purple-600 text-white rounded-full hover:shadow-[0_0_15px_#ec4899] hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg active:scale-95"
                     >
                         <ArrowUpCircle size={24} />
                     </button>
@@ -1041,26 +1088,26 @@ export const App: React.FC = () => {
 
 
     return (
-        <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50">
-            <header className="h-16 flex items-center justify-between px-4 md:px-6 bg-white/40 backdrop-blur-md border-b border-white/50 z-20 relative shrink-0">
+        <div className="h-screen w-screen flex flex-col overflow-hidden cosmic-bg text-white font-sans">
+            <header className="h-16 flex items-center justify-between px-4 md:px-6 z-20 relative shrink-0 border-b border-white/5 bg-gradient-to-b from-black/20 to-transparent backdrop-blur-sm">
                 {/* Mobile: Left Button opens Assets */}
-                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
+                <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
                     <Menu />
                 </button>
 
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-orange-400 rounded-lg shadow-lg flex items-center justify-center text-white font-bold font-display">A</div>
-                    <span className="text-xl font-display font-bold text-slate-900">AdStudio<span className="text-pink-600">.ai</span></span>
+                    <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-purple-600 rounded-lg shadow-[0_0_15px_rgba(236,72,153,0.5)] flex items-center justify-center text-white font-bold font-display">A</div>
+                    <span className="text-xl font-display font-bold text-white tracking-tight">AdStudio<span className="text-pink-500">.ai</span></span>
                 </div>
 
                 {/* Mobile: Right Button opens Settings */}
-                <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-slate-700 hover:bg-white/50 rounded-lg transition-colors">
+                <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
                     <Settings />
                 </button>
 
                 <div className="hidden lg:flex items-center gap-4">
-                    <span className="text-xs font-bold text-slate-500 uppercase bg-white/50 px-3 py-1 rounded-full border border-white">Gemini 3 Pro</span>
-                    <div className="w-8 h-8 bg-slate-200 rounded-full overflow-hidden border-2 border-white shadow-md">
+                    <span className="text-xs font-bold text-white/60 uppercase glass-panel px-3 py-1 rounded-full border border-white/20">Gemini 3 Pro</span>
+                    <div className="w-8 h-8 bg-white/10 rounded-full overflow-hidden border border-white/20 shadow-md">
                         <img src="https://picsum.photos/100" alt="User" />
                     </div>
                 </div>
@@ -1072,12 +1119,11 @@ export const App: React.FC = () => {
                     {/* Left Panel (Reference Manager) - Sliding on Mobile */}
                     <div className={`
                         fixed inset-y-0 left-0 w-80 lg:w-full lg:static lg:col-span-1 
-                        bg-white/95 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
-                        border-r border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
+                        glass-panel border-r border-white/10 z-30 transition-transform duration-300 ease-in-out
                         ${showLeftPanel ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
                     `}>
                         <div className="h-full relative pt-16 lg:pt-0">
-                            <button onClick={() => setShowLeftPanel(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16} /></button>
+                            <button onClick={() => setShowLeftPanel(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-white/10 rounded-full text-white/60"><X size={16} /></button>
                             <ReferenceManager
                                 files={files}
                                 setFiles={setFiles}
@@ -1088,19 +1134,18 @@ export const App: React.FC = () => {
                     </div>
 
                     {/* Center Panel (Project Board) */}
-                    <div className="col-span-1 lg:col-span-2 relative bg-white/5 w-full h-full overflow-hidden">
+                    <div className="col-span-1 lg:col-span-2 relative w-full h-full overflow-hidden">
                         <ProjectBoard project={project} setProject={setProject} settings={settings} />
                     </div>
 
                     {/* Right Panel (Settings) - Sliding on Mobile */}
                     <div className={`
                         fixed inset-y-0 right-0 w-80 lg:w-full lg:static lg:col-span-1 
-                        bg-white/95 backdrop-blur-xl lg:bg-white/20 lg:backdrop-blur-md 
-                        border-l border-white/40 shadow-2xl lg:shadow-lg z-30 transition-transform duration-300 ease-in-out
+                        glass-panel border-l border-white/10 z-30 transition-transform duration-300 ease-in-out
                         ${showRightPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
                     `}>
                         <div className="h-full relative pt-16 lg:pt-0">
-                            <button onClick={() => setShowRightPanel(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-slate-100 rounded-full text-slate-600"><X size={16} /></button>
+                            <button onClick={() => setShowRightPanel(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-white/10 rounded-full text-white/60"><X size={16} /></button>
                             <SettingsPanel settings={settings} setSettings={setSettings} />
                         </div>
                     </div>
@@ -1110,7 +1155,7 @@ export const App: React.FC = () => {
                 {/* Mobile Overlay for panels */}
                 {(showLeftPanel || showRightPanel) && (
                     <div
-                        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 lg:hidden"
+                        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 lg:hidden"
                         onClick={() => { setShowLeftPanel(false); setShowRightPanel(false); }}
                     />
                 )}
