@@ -1,15 +1,47 @@
 import { Router } from 'express';
-import db from '../db';
+import * as fs from 'fs';
+import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import db from '../db';
+
+// Helper to save JSON backup
+const saveProjectBackup = (project: any) => {
+    try {
+        const backupDir = path.join(__dirname, '../../data/projects');
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+        }
+
+        // Organize by user if possible, or flat list
+        const filename = `${project.id}.json`;
+        const filePath = path.join(backupDir, filename);
+
+        fs.writeFileSync(filePath, JSON.stringify(project, null, 2));
+        console.log(`Project backup saved: ${filePath}`);
+    } catch (error) {
+        console.error('Failed to save project backup:', error);
+    }
+};
+
+
 
 const router = Router();
 
-// GET all projects
+// GET all projects (User Scoped)
 router.get('/', (req, res) => {
     try {
-        const stmt = db.prepare('SELECT * FROM projects ORDER BY created_at DESC');
-        const projects = stmt.all();
-        res.json(projects);
+        const { userId } = req.query;
+        let stmt;
+
+        if (userId) {
+            stmt = db.prepare('SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC');
+            const projects = stmt.all(userId);
+            res.json(projects);
+        } else {
+            // Fallback for untracked/legacy - or return empty
+            res.json([]);
+        }
+
     } catch (error) {
         console.error('Error fetching projects:', error);
         res.status(500).json({ error: 'Failed to fetch projects' });
@@ -64,8 +96,8 @@ router.post('/', (req, res) => {
         const upsertStmt = db.prepare(`
       INSERT OR REPLACE INTO projects (
         id, title, concept, settings, current_phase, 
-        music_url, voiceover_url, full_script, music_mood, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        thumbnail_url, music_url, voiceover_url, full_script, music_mood, user_id, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `);
 
         upsertStmt.run(
@@ -74,10 +106,12 @@ router.post('/', (req, res) => {
             project.concept || '',
             JSON.stringify(project.settings || {}),
             project.currentPhase || 'planning',
+            project.thumbnailUrl || null,
             project.musicUrl || null,
             project.voiceoverUrl || null,
             project.fullScript || '',
-            project.musicMood || ''
+            project.musicMood || '',
+            project.userId || null // Save user_id
         );
 
         // Delete existing scenes and re-insert
@@ -111,6 +145,14 @@ router.post('/', (req, res) => {
                 scene.status || 'pending'
             );
         }
+
+
+        // [BACKUP] Save to JSON file as requested
+        saveProjectBackup({
+            ...project,
+            id: projectId,
+            updatedAt: new Date().toISOString()
+        });
 
         res.json({ id: projectId, message: 'Project saved' });
     } catch (error) {

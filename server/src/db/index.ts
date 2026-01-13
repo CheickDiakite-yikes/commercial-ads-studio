@@ -7,13 +7,14 @@ const db = new Database(dbPath);
 
 // Initialize tables
 export const initDb = () => {
-    db.exec(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       concept TEXT,
       settings TEXT DEFAULT '{}',
       current_phase TEXT DEFAULT 'planning',
+      thumbnail_url TEXT,
       music_url TEXT,
       voiceover_url TEXT,
       full_script TEXT,
@@ -39,8 +40,31 @@ export const initDb = () => {
       status TEXT DEFAULT 'pending',
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      company TEXT,
+      role TEXT,
+      source TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
-    console.log('SQLite database initialized');
+
+  try {
+    db.exec("ALTER TABLE projects ADD COLUMN thumbnail_url TEXT");
+  } catch (e) {
+    // Column likely exists
+  }
+
+  try {
+    db.exec("ALTER TABLE projects ADD COLUMN user_id TEXT");
+  } catch (e) {
+    // Column likely exists
+  }
+
+  console.log('SQLite database initialized');
 };
 
 export default db;

@@ -448,27 +448,41 @@ export const sendChatMessage = async (
 
 export const generateMusic = async (mood: string, duration: number = 30): Promise<string | null> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    try {
+
+    const tryGenerate = async (model: string) => {
         const response = await ai.models.generateContent({
-            model: 'lyria-realtime-exp',
+            model: model,
             contents: [{ parts: [{ text: `Generate ${mood} music for ${duration} seconds.` }] }],
             config: {
                 // @ts-ignore
                 responseModalities: [Modality.AUDIO]
             }
         });
-
         // @ts-ignore
-        const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    };
+
+    try {
+        console.log("Attempting Music Generation with lyria-realtime-exp...");
+        const base64Audio = await tryGenerate('lyria-realtime-exp');
         if (base64Audio) {
             const pcmData = base64ToUint8Array(base64Audio);
-            // Assuming Lyria output is 44.1kHz Stereo (2 channels)
             const wavBuffer = pcmToWavBuffer(pcmData, 44100, 2);
             return `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
         }
-        return null;
     } catch (error) {
-        console.error("Music Generation Error", error);
-        return null;
+        console.warn("Lyria generation failed, falling back to gemini-2.0-flash-exp", error);
+        try {
+            const base64Audio = await tryGenerate('gemini-2.0-flash-exp');
+            if (base64Audio) {
+                const pcmData = base64ToUint8Array(base64Audio);
+                // Gemini Flash might allow 24kHz mono/stereo, but let's assume standard handling
+                const wavBuffer = pcmToWavBuffer(pcmData, 24000, 1);
+                return `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
+            }
+        } catch (fallbackError) {
+            console.error("Music Generation Fallback Failed", fallbackError);
+        }
     }
+    return null;
 };

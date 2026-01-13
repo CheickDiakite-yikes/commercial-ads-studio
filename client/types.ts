@@ -25,15 +25,15 @@ export interface ReferenceFile {
   type: 'image' | 'pdf' | 'text' | 'link';
   content: string; // Base64 or Text or URL
   previewUrl?: string;
-  mimeType?: string; 
+  mimeType?: string;
 }
 
 export interface ChatAttachment {
   id: string;
   type: 'image' | 'video' | 'link';
-  url: string; 
+  url: string;
   mimeType: string;
-  base64Data: string; 
+  base64Data: string;
 }
 
 export interface ProjectSettings {
@@ -83,7 +83,7 @@ export interface Scene {
   id: string;
   order: number;
   duration: 4 | 6;
-  
+
   // New Rich Fields
   character: CharacterDetails;
   environment: EnvironmentDetails;
@@ -100,21 +100,23 @@ export interface Scene {
 
 export interface AdProject {
   title: string;
+  id?: string;
   concept: string;
+  thumbnailUrl?: string; // New field for portfolio
   musicMood: string;
   fullScript: string;
   script?: DialogueLine[];
-  
+
   // Global context is still useful for the initial brief, 
   // but individual scenes now carry specific overrides.
-  characterProfile?: string; 
-  visualStyleProfile?: string; 
-  
+  characterProfile?: string;
+  visualStyleProfile?: string;
+
   scenes: Scene[];
   voiceoverUrl?: string;
   musicUrl?: string;
   visualAnchor?: string;
-  
+
   ffmpegCommand?: string;
   isGenerating: boolean;
   currentPhase: 'planning' | 'storyboarding' | 'video_production' | 'voiceover' | 'scoring' | 'mixing' | 'ready';
@@ -127,5 +129,5 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
   isThinking?: boolean;
-  attachments?: ChatAttachment[]; 
+  attachments?: ChatAttachment[];
 }

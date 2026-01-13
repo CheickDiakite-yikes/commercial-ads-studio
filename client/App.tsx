@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AdProject, AspectRatio, ChatMessage, ProjectSettings, ReferenceFile, TTSVoice, OverlayConfig, ProjectMode, ChatAttachment, Scene } from './types';
 import * as ApiService from './services/api';
+import { ProjectBrowser } from './components/ProjectBrowser';
+import { LandingPage } from './components/LandingPage';
+import { AuthModal } from './components/AuthModal';
 import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye, Sparkles, Paperclip, FileImage, FileVideo, Link as LinkIcon, Youtube, Image as ImageIcon, VenetianMask, Palette, Video, Camera, Shirt, Sun, ChevronDown, ChevronUp } from 'lucide-react';
 
 // --- Reference Manager (Left Panel) ---
@@ -228,9 +231,11 @@ const SettingsPanel: React.FC<{
                         <button key={opt} onClick={() => setSettings(prev => ({ ...prev, useTextOverlays: opt as any }))} className={`flex-1 py-2 text-xs font-bold rounded-md capitalize transition-all ${settings.useTextOverlays === opt ? 'bg-white/10 text-white shadow-sm border border-white/10' : 'text-white/30 hover:text-white/60'}`}>{opt}</button>
                     ))}
                 </div>
-                {settings.useTextOverlays !== 'no' && (
-                    <input type="text" placeholder="Preferred Font (Optional)" className="w-full p-3 rounded-xl border border-white/10 bg-black/20 text-white text-sm focus:border-pink-500/50 outline-none placeholder:text-white/20" value={settings.textOverlayFont || ''} onChange={(e) => setSettings(prev => ({ ...prev, textOverlayFont: e.target.value }))} />
-                )}
+                <div className="min-h-[48px]">
+                    {settings.useTextOverlays !== 'no' && (
+                        <input type="text" placeholder="Preferred Font (Optional)" className="w-full p-3 rounded-xl border border-white/10 bg-black/20 text-white text-sm focus:border-pink-500/50 outline-none placeholder:text-white/20" value={settings.textOverlayFont || ''} onChange={(e) => setSettings(prev => ({ ...prev, textOverlayFont: e.target.value }))} />
+                    )}
+                </div>
             </div>
             <div className="space-y-3">
                 <label className="text-xs font-bold text-fuchsia-300/70 uppercase tracking-wider flex items-center gap-2"><Music size={14} className="text-fuchsia-400" /> Music Theme</label>
@@ -348,9 +353,10 @@ const ProjectBoard: React.FC<{
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
 
-    const totalDuration = project ? project.scenes.reduce((acc, scene) => acc + scene.duration, 0) : 0;
+    const totalDuration = project?.scenes?.reduce((acc, scene) => acc + scene.duration, 0) || 0;
 
     useEffect(() => {
+        if (!project || !project.scenes) return; // FIX CRASH HERE
         let animationFrameId: number;
         let lastTime = performance.now();
 
@@ -399,7 +405,7 @@ const ProjectBoard: React.FC<{
     }, [isPlaying, totalDuration, isExporting, activeSceneIndex, project]);
 
     useEffect(() => {
-        if (!project) return;
+        if (!project || !project.scenes) return; // FIX: Ensure scenes exist
         let accumulatedTime = 0;
         let newIndex = 0;
         for (let i = 0; i < project.scenes.length; i++) {
@@ -877,11 +883,11 @@ const AgentChat: React.FC<{
 
     return (
         <div className={`
-        fixed bottom-0 right-0 w-full lg:w-96 lg:right-6 lg:bottom-6 
-        glass-panel z-[100] 
-        flex flex-col overflow-hidden transition-all duration-300 ease-in-out border border-white/20 shadow-2xl
-        ${isOpen ? 'h-[60vh] lg:h-[600px] rounded-t-2xl lg:rounded-2xl' : 'h-14 rounded-t-xl lg:rounded-xl'}
-    `}>
+        fixed bottom-1 right-1 left-1 lg:left-auto lg:bottom-6 lg:right-6 lg:w-96 
+        glass-panel z-[1000] 
+        flex flex-col overflow-hidden transition-all duration-300 shadow-2xl
+        ${isOpen ? 'h-[50vh] lg:h-[600px] border border-white/10 rounded-3xl' : 'h-14 lg:h-14 w-auto rounded-full cursor-pointer hover:bg-white/10 border-none'}
+        `}>
             {/* Header */}
             <div
                 className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white flex justify-between items-center cursor-pointer hover:saturate-150 transition-all border-b border-white/10"
@@ -992,7 +998,13 @@ const AgentChat: React.FC<{
 }
 
 export const App: React.FC = () => {
-    // ... (Existing state hooks)
+    // Auth State
+    const [user, setUser] = useState<any>(null);
+    const [token, setToken] = useState<string | null>(null);
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+
+    // App State
     const [files, setFiles] = useState<ReferenceFile[]>([]);
     const [visualAnchor, setVisualAnchor] = useState<ReferenceFile | null>(null);
     const [settings, setSettings] = useState<ProjectSettings>({
@@ -1007,27 +1019,87 @@ export const App: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [showLeftPanel, setShowLeftPanel] = useState(false);
     const [showRightPanel, setShowRightPanel] = useState(false);
+    const [showPortfolio, setShowPortfolio] = useState(false);
     const [hasKey, setHasKey] = useState(false);
+
+    // Check for cached token on load
+    useEffect(() => {
+        const storedToken = localStorage.getItem('auth_token');
+        const storedUser = localStorage.getItem('auth_user');
+        if (storedToken && storedUser) {
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+        }
+    }, []);
+
+    const handleAuthSuccess = (userData: any, authToken: string) => {
+        setUser(userData);
+        setToken(authToken);
+        localStorage.setItem('auth_token', authToken);
+        localStorage.setItem('auth_user', JSON.stringify(userData));
+        setShowAuthModal(false);
+    };
+
+    const handleLogout = () => {
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        setProject(null);
+    };
 
     useEffect(() => {
         setHasKey(true);
     }, []);
 
-    // Autosave Project
+    // Autosave Project with Thumbnail Logic
     useEffect(() => {
         if (project) {
             const saveTimeout = setTimeout(() => {
-                ApiService.saveProject(project)
-                    .then(res => console.log('Project autosaved', res.id))
+                // Find best thumbnail: Frame 1 > Storyboard 1 > Visual Anchor
+                const thumb = project.scenes?.[0]?.videoUrl || project.scenes?.[0]?.storyboardUrl || visualAnchor?.content;
+                const projectToSave = { ...project, thumbnailUrl: thumb, userId: user?.id }; // Added userId if available
+
+                ApiService.saveProject(projectToSave)
+                    .then(res => {
+                        console.log('Project autosaved', res.id);
+                        // CRITICAL FIX: Update local project ID so subsequent saves are updates, not creates
+                        if (!project.id && res.id) {
+                            setProject(prev => prev ? { ...prev, id: res.id } : null);
+                        }
+                    })
                     .catch(err => console.error('Autosave failed', err));
             }, 2000);
             return () => clearTimeout(saveTimeout);
         }
-    }, [project]);
+    }, [project, visualAnchor, user]);
+
+
+    // --- RENDER ---
+    if (!user) {
+        return (
+            <>
+                <LandingPage
+                    onLoginClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                    onSignupClick={() => { setAuthMode('signup'); setShowAuthModal(true); }}
+                />
+                {showAuthModal && (
+                    <AuthModal
+                        mode={authMode}
+                        onClose={() => setShowAuthModal(false)}
+                        onSuccess={handleAuthSuccess}
+                        switchToLogin={() => setAuthMode('login')}
+                        switchToSignup={() => setAuthMode('signup')}
+                    />
+                )}
+            </>
+        );
+    }
 
     const handleGenerate = async (prompt: string, attachments?: ChatAttachment[]) => {
         setIsProcessing(true);
         try {
+            // ... (rest of generation logic remains same)
             // 1. Plan
             const plan = await ApiService.generateAdPlan(prompt, settings, files);
 
@@ -1036,21 +1108,31 @@ export const App: React.FC = () => {
                 isGenerating: true,
                 currentPhase: 'storyboarding',
                 scenes: plan.scenes.map((s: any) => ({ ...s, status: 'pending' })),
-                mode: settings.mode
+                mode: settings.mode,
+                thumbnailUrl: visualAnchor?.content // Initial thumbnail
             };
             setProject(newProject);
 
+            // ... (rest of logic)
             // 2. Storyboards
             const scenesWithStoryboards = await Promise.all(newProject.scenes.map(async (scene: Scene) => {
                 const img = await ApiService.generateStoryboardImage(
-                    scene, // PASSING FULL SCENE OBJECT NOW
+                    scene,
                     settings.aspectRatio,
-                    visualAnchor?.content
+                    visualAnchor?.content,
+                    user?.id,
+                    newProject.id
                 );
                 return { ...scene, storyboardUrl: img || undefined, status: 'pending' } as Scene;
             }));
 
-            setProject(prev => prev ? { ...prev, scenes: scenesWithStoryboards as any, currentPhase: 'video_production' } : null);
+            // Update project with first storyboard as thumbnail if available
+            setProject(prev => prev ? {
+                ...prev,
+                scenes: scenesWithStoryboards as any,
+                currentPhase: 'video_production',
+                thumbnailUrl: scenesWithStoryboards[0]?.storyboardUrl || prev.thumbnailUrl
+            } : null);
 
             // 3. Videos
             const scenesWithVideo: any[] = [];
@@ -1065,9 +1147,11 @@ export const App: React.FC = () => {
                 });
 
                 const video = await ApiService.generateVideoClip(
-                    scene, // PASSING FULL SCENE OBJECT
+                    scene,
                     settings.aspectRatio,
-                    scene.storyboardUrl
+                    scene.storyboardUrl,
+                    user?.id,
+                    newProject.id
                 );
 
                 const updatedScene = { ...scene, videoUrl: video || undefined, status: 'complete' } as Scene;
@@ -1077,18 +1161,22 @@ export const App: React.FC = () => {
                     if (!prev) return null;
                     return {
                         ...prev,
-                        scenes: prev.scenes.map(s => s.id === scene.id ? updatedScene : s) as any
+                        scenes: prev.scenes.map(s => s.id === scene.id ? updatedScene : s) as any,
+                        // Update thumbnail to video if it's the first scene
+                        thumbnailUrl: (scene.order === 1 && video) ? video : prev.thumbnailUrl
                     };
                 });
             }
 
+            // ... (rest of audio logic)
             // 4. Audio
             setProject(prev => prev ? { ...prev, currentPhase: 'voiceover' } : null);
-            const vo = await ApiService.generateVoiceover(plan.fullScript, settings.preferredVoice === 'auto' ? TTSVoice.Kore : settings.preferredVoice, plan.script);
+            const vo = await ApiService.generateVoiceover(plan.fullScript, settings.preferredVoice === 'auto' ? TTSVoice.Kore : settings.preferredVoice, plan.script, user?.id, newProject.id);
             setProject(prev => prev ? { ...prev, currentPhase: 'scoring', voiceoverUrl: vo || undefined } : null);
 
-            const music = await ApiService.generateMusic(plan.musicMood || settings.musicTheme);
+            const music = await ApiService.generateMusic(plan.musicMood || settings.musicTheme, 30, user?.id, newProject.id);
             setProject(prev => prev ? { ...prev, currentPhase: 'ready', musicUrl: music || undefined, isGenerating: false } : null);
+            setIsProcessing(false);
 
         } catch (e) {
             console.error("Generation failed", e);
@@ -1097,10 +1185,8 @@ export const App: React.FC = () => {
         }
     };
 
-
-
     return (
-        <div className="h-screen w-screen flex flex-col overflow-hidden cosmic-bg text-white font-sans">
+        <div className="fixed inset-0 flex flex-col overflow-hidden cosmic-bg text-white font-sans">
             <header className="h-16 flex items-center justify-between px-4 md:px-6 z-20 relative shrink-0 border-b border-white/5 bg-gradient-to-b from-black/20 to-transparent backdrop-blur-sm">
                 {/* Mobile: Left Button opens Assets */}
                 <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
@@ -1108,22 +1194,48 @@ export const App: React.FC = () => {
                 </button>
 
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-tr from-pink-500 to-purple-600 rounded-lg shadow-[0_0_15px_rgba(236,72,153,0.5)] flex items-center justify-center text-white font-bold font-display">A</div>
+                    <div className="w-8 h-8 hidden md:flex bg-gradient-to-tr from-pink-500 to-purple-600 rounded-lg shadow-[0_0_15px_rgba(236,72,153,0.5)] items-center justify-center text-white font-bold font-display">A</div>
                     <span className="text-xl font-display font-bold text-white tracking-tight">AdStudio<span className="text-pink-500">.ai</span></span>
                 </div>
 
-                {/* Mobile: Right Button opens Settings */}
-                <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
-                    <Settings />
-                </button>
+                <div className="flex items-center gap-2">
+                    {/* Mobile Portfolio Button */}
+                    <button onClick={() => setShowPortfolio(true)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
+                        <Layers size={20} />
+                    </button>
+
+                    {/* Mobile: Right Button opens Settings */}
+                    <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
+                        <Settings />
+                    </button>
+                </div>
 
                 <div className="hidden lg:flex items-center gap-4">
-                    <span className="text-xs font-bold text-white/60 uppercase glass-panel px-3 py-1 rounded-full border border-white/20">Gemini 3 Pro</span>
+                    <button
+                        onClick={() => setShowPortfolio(true)}
+                        className="flex items-center gap-2 px-4 py-1.5 rounded-full glass-panel border border-white/20 hover:bg-white/10 transition-colors text-xs font-bold uppercase tracking-wider text-pink-200"
+                    >
+                        <Layers size={14} /> My Projects
+                    </button>
                     <div className="w-8 h-8 bg-white/10 rounded-full overflow-hidden border border-white/20 shadow-md">
                         <img src="https://picsum.photos/100" alt="User" />
                     </div>
+                    <button onClick={handleLogout} className="text-white/40 hover:text-white transition-colors">
+                        <X size={20} />
+                    </button>
                 </div>
             </header>
+
+            {showPortfolio && (
+                <ProjectBrowser
+                    onClose={() => setShowPortfolio(false)}
+                    onLoadProject={(p) => {
+                        setProject(p);
+                        setSettings((prev) => ({ ...prev, ...p.settings } as any)); // Restore settings
+                        setShowPortfolio(false);
+                    }}
+                />
+            )}
 
             <div className="flex-1 relative overflow-hidden">
                 <div className="w-full h-full grid grid-cols-1 lg:grid-cols-4">
@@ -1173,7 +1285,10 @@ export const App: React.FC = () => {
                 )}
             </div>
 
+            {/* Mobile Bottom Padding to prevent content cut-off */}
+            <div className="h-24 lg:hidden shrink-0"></div>
+
             <AgentChat onGenerate={handleGenerate} isProcessing={isProcessing} project={project} />
-        </div>
+        </div >
     );
 }
