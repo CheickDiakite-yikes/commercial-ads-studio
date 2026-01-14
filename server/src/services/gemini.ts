@@ -65,7 +65,7 @@ const adPlanSchema: Schema = {
         title: { type: Type.STRING },
         concept: { type: Type.STRING },
         musicMood: { type: Type.STRING },
-        characterProfile: { type: Type.STRING, description: "Detailed physical description of the main character to be used as a fallback." },
+        masterCharacterProfile: { type: Type.STRING, description: "EXTREMELY DETAILED 300+ word physical description of the main character. Must include: Skin texture (pores, freckles), exact eye shape/color, hair texture/strand behavior, facial structure (cheekbones, jawline), and body type. This is the 'Source of Truth' for the character." },
         visualStyleProfile: { type: Type.STRING, description: "Detailed world description." },
         fullScript: { type: Type.STRING },
         script: {
@@ -90,7 +90,7 @@ const adPlanSchema: Schema = {
                         type: Type.OBJECT,
                         properties: {
                             name: { type: Type.STRING },
-                            description: { type: Type.STRING },
+                            description: { type: Type.STRING, description: "Must copy the 'masterCharacterProfile' here to ensure consistency." },
                             hair: { type: Type.STRING },
                             face: { type: Type.STRING },
                             wardrobe: { type: Type.STRING }
@@ -142,7 +142,7 @@ const adPlanSchema: Schema = {
         },
         ffmpegCommand: { type: Type.STRING }
     },
-    required: ["title", "concept", "scenes", "musicMood", "fullScript"]
+    required: ["title", "concept", "scenes", "musicMood", "fullScript", "masterCharacterProfile"]
 };
 
 export const generateAdPlan = async (
@@ -187,6 +187,11 @@ export const generateAdPlan = async (
 
     TASK: Generate a 30-second Video Ad Plan using the "Director's JSON" structure.
     
+    CRITICAL INSTRUCTION - CHARACTER CONSISTENCY:
+    You MUST generate a 'masterCharacterProfile' that is AT LEAST 300 WORDS long.
+    Do not be vague. define every wrinkle, the exact shade of skin (e.g. "warm sienna with cool undertones"), the texture of hair (e.g. "3b curls with slight frizz at the crown"), specific facial landmarks (e.g. "a small mole above the left eyebrow").
+    This 'masterCharacterProfile' MUST be pasted verbatim into 'scene.character.description' for EVERY scene to ensure the video generation model sees the exact same prompt every time.
+    
     INSTRUCTIONS:
     1. **Detailed Breakdowns**: For EVERY scene, you must generate specific details for Camera (Framing/Movement), Character (Wardrobe/Hair), and Environment (Lighting/Look).
     2. **Consistency**: The 'character.description' and 'environment.look' should be somewhat consistent across scenes unless the location changes.
@@ -203,7 +208,7 @@ export const generateAdPlan = async (
 
     try {
         const requestConfig: any = {
-            systemInstruction: "You are an elite Film Director. You break down scenes into granular technical components (Lighting, Wardrobe, Camera, Blocking) to ensure perfect production consistency.",
+            systemInstruction: "You are an elite Film Director. You specialize in Hyper-Consistent Character Design. You break down scenes into granular technical components (Lighting, Wardrobe, Camera, Blocking) to ensure perfect production consistency.",
             responseMimeType: "application/json",
             responseSchema: adPlanSchema,
         };
@@ -217,7 +222,18 @@ export const generateAdPlan = async (
             contents: [{ parts: contentParts }],
             config: requestConfig
         });
-        return JSON.parse(response.text || "{}");
+        const plan = JSON.parse(response.text || "{}");
+
+        // CONSISTENCY ENFORCEMENT: Programmatically overwrite scene descriptions
+        if (plan.masterCharacterProfile && plan.scenes) {
+            plan.scenes.forEach((scene: any) => {
+                if (scene.character) {
+                    scene.character.description = plan.masterCharacterProfile;
+                }
+            });
+        }
+
+        return plan;
     } catch (error) {
         console.error("Ad Plan Generation Failed:", error);
         throw error;
@@ -246,6 +262,7 @@ export const generateStoryboardImage = async (
     }
 
     // 2. Construct the Director's Prompt
+    // We use the FULL character description here to ensure the storyboard matches the video.
     const prompt = `
       Create a photorealistic cinematic shot.
       
@@ -255,7 +272,7 @@ export const generateStoryboardImage = async (
       
       [LOCATION]: ${scene.environment.location}.
       
-      [SUBJECT]: ${scene.character.description}. 
+      [SUBJECT]: ${scene.character.description}
       - Hair: ${scene.character.hair}
       - Wardrobe: ${scene.character.wardrobe}
       - Face: ${scene.character.face}
@@ -339,9 +356,12 @@ export const generateVideoClip = async (
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
 
+    // CONSISTENCY HACK: Even if we have an image, we enforce the detailed description in the prompt.
+    // This guides the model to maintain the identity even when transforming the image.
     const veoPrompt = `
       Cinematic video.
-      ${scene.action_blocking.map(a => a.notes).join('. ')}
+      [CHARACTER]: ${scene.character.description}
+      [ACTION]: ${scene.action_blocking.map(a => a.notes).join('. ')}
       Camera: ${scene.camera.movement}.
       Lighting: ${scene.environment.lighting}.
     `;
@@ -354,7 +374,7 @@ export const generateVideoClip = async (
         }
     }
 
-    return await internalGenerateVideo(ai, scene.visual_summary_prompt + " (Cinematic, Photorealistic)", aspect, undefined);
+    return await internalGenerateVideo(ai, veoPrompt + " (Cinematic, Photorealistic)", aspect, undefined);
 };
 
 export const generateVoiceover = async (text: string, voice: TTSVoice, dialogue?: DialogueLine[]): Promise<string | null> => {
@@ -408,26 +428,75 @@ export const generateVoiceover = async (text: string, voice: TTSVoice, dialogue?
     }
 };
 
+import * as fs from 'fs';
+import * as path from 'path';
+
+// ... (other imports)
+
 export const sendChatMessage = async (
     history: any[],
     message: string,
-    attachments?: ChatAttachment[]
+    attachments?: ChatAttachment[],
+    project?: any
 ) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     let parts: any[] = [];
     let hasLinks = false;
 
+    // 1. Handle Manual Attachments
     if (attachments && attachments.length > 0) {
         attachments.forEach(att => {
             if (att.type === 'link') {
                 hasLinks = true;
                 parts.push({ text: `[REFERENCE LINK]: ${att.url} (Use Google Search to analyze this link)` });
             } else {
+                console.log(`[Chat] Processing attachment: ${att.mimeType}, size: ${att.base64Data.length} bytes`);
                 parts.push({
                     inlineData: { mimeType: att.mimeType, data: att.base64Data }
                 });
             }
         });
+    }
+
+    // 2. Handle Project Context (Auto-Video Understanding)
+    if (project && project.scenes) {
+        console.log(`[Chat] Analyzing project context for videos...`);
+        // We limit to the last 3 generated videos to avoid payload limits/latency, prioritizing recent work.
+        // Or if specific scene is mentioned in 'message', we could target that, but for now we send recent context.
+        const validScenes = project.scenes.filter((s: any) => s.videoUrl && s.videoUrl.startsWith('/api/assets/'));
+
+        // Take up to 3 most recent scenes (or all if few)
+        const scenesToAttach = validScenes.slice(-3);
+
+        for (const scene of scenesToAttach) {
+            try {
+                // Parse URL: /api/assets/userId/projectId/filename.mp4
+                // parts = ["", "api", "assets", "userId", "projectId", "filename"]
+                const urlParts = scene.videoUrl.split('/');
+                if (urlParts.length >= 6) {
+                    const userId = urlParts[3];
+                    const projectId = urlParts[4];
+                    const filename = urlParts[5];
+                    const filePath = path.join(__dirname, '../../data/assets', userId, projectId, filename);
+
+                    if (fs.existsSync(filePath)) {
+                        console.log(`[Chat] Auto-attaching scene ${scene.id} video: ${filename}`);
+                        const videoBuffer = fs.readFileSync(filePath);
+                        const base64Video = videoBuffer.toString('base64');
+
+                        parts.push({ text: `[CONTEXT] Scene ${scene.order} Video:` });
+                        parts.push({
+                            inlineData: {
+                                mimeType: 'video/mp4', // Assumption based on generation output
+                                data: base64Video
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("[Chat] Failed to attach project video context", e);
+            }
+        }
     }
 
     parts.push({ text: message });
@@ -463,25 +532,30 @@ export const generateMusic = async (mood: string, duration: number = 30): Promis
     };
 
     try {
-        console.log("Attempting Music Generation with lyria-realtime-exp...");
+        console.log(`[Music] Attempting to generate '${mood}' music (${duration}s) with lyria-realtime-exp...`);
         const base64Audio = await tryGenerate('lyria-realtime-exp');
         if (base64Audio) {
+            console.log(`[Music] Success! Received ${base64Audio.length} bytes from Lyria.`);
             const pcmData = base64ToUint8Array(base64Audio);
+            // Lyria usually returns 44.1kHz stereo
             const wavBuffer = pcmToWavBuffer(pcmData, 44100, 2);
             return `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
+        } else {
+            console.warn("[Music] Lyria returned no audio data.");
         }
     } catch (error) {
-        console.warn("Lyria generation failed, falling back to gemini-2.0-flash-exp", error);
+        console.warn("[Music] Lyria generation failed, falling back to gemini-2.0-flash-exp", error);
         try {
             const base64Audio = await tryGenerate('gemini-2.0-flash-exp');
             if (base64Audio) {
+                console.log(`[Music] Success (Fallback)! Received ${base64Audio.length} bytes.`);
                 const pcmData = base64ToUint8Array(base64Audio);
                 // Gemini Flash might allow 24kHz mono/stereo, but let's assume standard handling
                 const wavBuffer = pcmToWavBuffer(pcmData, 24000, 1);
                 return `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
             }
         } catch (fallbackError) {
-            console.error("Music Generation Fallback Failed", fallbackError);
+            console.error("[Music] Music Generation Fallback Failed", fallbackError);
         }
     }
     return null;

@@ -6,8 +6,8 @@ const router = Router();
 
 router.post('/chat', async (req, res) => {
     try {
-        const { history, message, attachments } = req.body;
-        const response = await sendChatMessage(history, message, attachments);
+        const { history, message, attachments, project } = req.body;
+        const response = await sendChatMessage(history, message, attachments, project);
         res.json({ text: response });
     } catch (error) {
         console.error('Chat error:', error);

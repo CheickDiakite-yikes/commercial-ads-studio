@@ -121,7 +121,7 @@ export const sendChatMessage = async (
     const response = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, message, attachments })
+        body: JSON.stringify({ history, message, attachments, project })
     });
     if (!response.ok) throw new Error('Chat failed');
     const data = await response.json();

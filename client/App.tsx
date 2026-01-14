@@ -4,7 +4,7 @@ import * as ApiService from './services/api';
 import { ProjectBrowser } from './components/ProjectBrowser';
 import { LandingPage } from './components/LandingPage';
 import { AuthModal } from './components/AuthModal';
-import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye, Sparkles, Paperclip, FileImage, FileVideo, Link as LinkIcon, Youtube, Image as ImageIcon, VenetianMask, Palette, Video, Camera, Shirt, Sun, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowUpCircle, Film, Layers, Settings, FileText, Music, Mic, X, Plus, Play, Download, MessageSquare, Loader2, Pause, CheckCircle2, Menu, ImagePlus, User, Eye, Sparkles, Paperclip, FileImage, FileVideo, Link as LinkIcon, Youtube, Image as ImageIcon, VenetianMask, Palette, Video, Camera, Shirt, Sun, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
 
 // --- Reference Manager (Left Panel) ---
 const ReferenceManager: React.FC<{
@@ -599,7 +599,7 @@ const ProjectBoard: React.FC<{
 
                 {activeTab === 'output' ? (
                     <div className="flex flex-col items-center h-full max-w-5xl mx-auto">
-                        {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 0.3; }} />}
+                        {project.musicUrl && <audio key={project.musicUrl} ref={musicRef} src={project.musicUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Music", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 0.6; }} />}
                         {project.voiceoverUrl && <audio key={project.voiceoverUrl} ref={voRef} src={project.voiceoverUrl} crossOrigin="anonymous" onError={(e) => handleAudioError("Voice", e)} onLoadedMetadata={(e) => { e.currentTarget.volume = 1.0; }} />}
 
                         {/* Title Section */}
@@ -854,9 +854,11 @@ const AgentChat: React.FC<{
             reader.onload = (ev) => {
                 const result = ev.target?.result as string;
                 const base64 = result.split(',')[1];
+                const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'link';
+
                 const newAtt: ChatAttachment = {
                     id: Date.now().toString(),
-                    type: file.type.startsWith('image/') ? 'image' : 'link', // Basic check
+                    type: type as any,
                     url: URL.createObjectURL(file), // Preview URL
                     mimeType: file.type,
                     base64Data: base64
@@ -914,6 +916,8 @@ const AgentChat: React.FC<{
                                         <div key={att.id} className="relative group shrink-0">
                                             {att.type === 'image' ? (
                                                 <img src={att.url} className="w-16 h-16 object-cover rounded-lg border border-white/20" />
+                                            ) : att.type === 'video' ? (
+                                                <video src={att.url} className="w-16 h-16 object-cover rounded-lg border border-white/20" muted />
                                             ) : (
                                                 <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center text-red-400 border border-white/10">
                                                     <Youtube size={24} />
@@ -960,7 +964,13 @@ const AgentChat: React.FC<{
                         {attachments.map(att => (
                             <div key={att.id} className="relative group shrink-0">
                                 <div className="w-10 h-10 rounded-lg bg-black/40 overflow-hidden border border-white/10 flex items-center justify-center">
-                                    {att.type === 'image' ? <img src={att.url} className="w-full h-full object-cover" /> : <LinkIcon size={16} className="text-white/60" />}
+                                    {att.type === 'image' ? (
+                                        <img src={att.url} className="w-full h-full object-cover" />
+                                    ) : att.type === 'video' ? (
+                                        <video src={att.url} className="w-full h-full object-cover" muted />
+                                    ) : (
+                                        <LinkIcon size={16} className="text-white/60" />
+                                    )}
                                 </div>
                                 <button onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10} /></button>
                             </div>
@@ -974,7 +984,7 @@ const AgentChat: React.FC<{
                     <button onClick={() => fileInputRef.current?.click()} className="p-2 text-white/50 hover:text-pink-400 hover:bg-white/10 rounded-full transition-colors">
                         <Paperclip size={20} />
                     </button>
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAttachment} />
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={handleAttachment} />
 
                     <input
                         className="flex-1 bg-black/40 text-white border border-white/10 rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-pink-500 outline-none placeholder:text-white/30 transition-all font-medium"
@@ -1207,6 +1217,11 @@ export const App: React.FC = () => {
                     {/* Mobile: Right Button opens Settings */}
                     <button onClick={() => setShowRightPanel(!showRightPanel)} className="lg:hidden p-2 text-white/70 hover:bg-white/10 rounded-lg transition-colors">
                         <Settings />
+                    </button>
+
+                    {/* Mobile Sign Out */}
+                    <button onClick={handleLogout} className="lg:hidden p-2 text-red-400 hover:bg-white/10 rounded-lg transition-colors">
+                        <LogOut size={20} />
                     </button>
                 </div>
 
