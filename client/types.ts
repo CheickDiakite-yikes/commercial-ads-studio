@@ -111,6 +111,7 @@ export interface AdProject {
   // but individual scenes now carry specific overrides.
   characterProfile?: string;
   visualStyleProfile?: string;
+  characterAnchorUrl?: string; // [NEW] Master reference image URL
 
   scenes: Scene[];
   voiceoverUrl?: string;

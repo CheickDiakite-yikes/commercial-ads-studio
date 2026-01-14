@@ -240,28 +240,78 @@ export const generateAdPlan = async (
     }
 };
 
+// [NEW] Generate the Master Character Reference
+export const generateCharacterPortrait = async (description: string): Promise<string | null> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // Ensuring we use a high-fidelity model for the "Source of Truth"
+    const model = 'gemini-3-pro-image-preview';
+
+    const prompt = `
+    Hyper-realistic cinematic portrait of the following character:
+    ${description}
+    
+    Lighting: Neutral, soft studio lighting to clearly show features.
+    Angle: Eye-level, facing forward (mugshot style but artistic).
+    Make sure facial features (eyes, nose, lips) are extremely distinct.
+    high resolution, 8k, detailed texture.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model,
+            contents: [{ parts: [{ text: prompt }] }],
+            config: {
+                // @ts-ignore
+                imageConfig: { aspectRatio: '9:16', imageSize: "1024x1024" }
+            }
+        });
+
+        // @ts-ignore
+        const part = response.candidates?.[0]?.content?.parts?.[0];
+        if (part && part.inlineData) {
+            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+        }
+        return null;
+    } catch (e) {
+        console.error("Character Portrait Generation Failed:", e);
+        return null;
+    }
+};
+
 export const generateStoryboardImage = async (
     scene: Scene,
     aspectRatio: AspectRatio,
     visualAnchorDataUrl?: string,
+    characterReferenceDataUrl?: string // [NEW] Accept the Master Portrait
 ): Promise<string | null> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const aspect = aspectRatio === AspectRatio.SixteenNine ? '16:9' : '9:16';
 
     const parts: any[] = [];
 
-    // 1. Inject Visual Anchor
+    // 1. Inject Visual Anchor (Style/Vibe)
     if (visualAnchorDataUrl) {
         const parsed = parseDataUrl(visualAnchorDataUrl);
         if (parsed) {
             parts.push({
                 inlineData: { mimeType: parsed.mimeType, data: parsed.base64 }
             });
-            parts.push({ text: "REFERENCE IMAGE: Use the subject from this image. Keep their face and body consistent." });
+            parts.push({ text: "STYLE REFERENCE: Use the lighting and color grading from this image." });
         }
     }
 
-    // 2. Construct the Director's Prompt
+    // 2. [NEW] Inject Character Anchor (Identity)
+    if (characterReferenceDataUrl) {
+        const parsed = parseDataUrl(characterReferenceDataUrl);
+        if (parsed) {
+            parts.push({
+                inlineData: { mimeType: parsed.mimeType, data: parsed.base64 }
+            });
+            parts.push({ text: "CHARACTER REFERENCE: The person in the output image MUST look exactly like this person. Maintain facial structure, hair, and skin tone." });
+        }
+    }
+
+    // 3. Construct the Director's Prompt
     // We use the FULL character description here to ensure the storyboard matches the video.
     const prompt = `
       Create a photorealistic cinematic shot.

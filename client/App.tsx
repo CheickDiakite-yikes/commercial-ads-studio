@@ -675,6 +675,26 @@ const ProjectBoard: React.FC<{
                             <p className="text-sm text-slate-500">
                                 The AI Agent has deconstructed the video into granular technical components to ensure maximum consistency across scenes.
                             </p>
+
+                            {/* Master Character Reference Display */}
+                            {project.characterAnchorUrl && (
+                                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-center gap-6 mt-4">
+                                    <div className="w-20 h-20 rounded-lg overflow-hidden shadow-sm border border-slate-300 shrink-0 relative group">
+                                        <img src={project.characterAnchorUrl} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] text-white font-bold text-center p-1">
+                                            Source of Truth
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="text-purple-600 font-bold uppercase tracking-wider text-xs flex items-center gap-2">
+                                            <Sparkles size={14} className="text-purple-500" /> Master Character Reference
+                                        </h4>
+                                        <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                                            {project.characterProfile || "This generated portrait is used as the strict visual anchor for all scenes to ensure perfect identity consistency."}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-8">
@@ -1124,12 +1144,36 @@ export const App: React.FC = () => {
             setProject(newProject);
 
             // ... (rest of logic)
+            // 1.5 Generate Master Character Portrait (Consistency Anchor)
+            let characterAnchorUrl: string | undefined = undefined;
+            if (plan.masterCharacterProfile) {
+                // Determine phase: Character Design
+                setProject(prev => prev ? { ...prev, currentPhase: 'planning' } : null); // Or add a specific phase
+
+                characterAnchorUrl = await ApiService.generateCharacterPortrait(
+                    plan.masterCharacterProfile,
+                    user?.id,
+                    newProject.id
+                ) || undefined;
+
+                if (characterAnchorUrl) {
+                    console.log("Master Character Portrait Generated:", characterAnchorUrl);
+                    // Update project with anchor
+                    newProject.characterProfile = plan.masterCharacterProfile; // Ensure this is saved
+                    newProject.characterAnchorUrl = characterAnchorUrl;
+                    setProject(prev => prev ? { ...prev, characterAnchorUrl: characterAnchorUrl } : null);
+                }
+            }
+
             // 2. Storyboards
+            setProject(prev => prev ? { ...prev, currentPhase: 'storyboarding' } : null);
+
             const scenesWithStoryboards = await Promise.all(newProject.scenes.map(async (scene: Scene) => {
                 const img = await ApiService.generateStoryboardImage(
                     scene,
                     settings.aspectRatio,
                     visualAnchor?.content,
+                    characterAnchorUrl, // [NEW] Pass the character anchor
                     user?.id,
                     newProject.id
                 );

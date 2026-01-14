@@ -45,17 +45,34 @@ export const generateAdPlan = async (
     return response.json();
 };
 
+// [NEW]
+export const generateCharacterPortrait = async (
+    description: string,
+    userId?: string,
+    projectId?: string
+): Promise<string | null> => {
+    const response = await fetch(`${API_BASE}/generate/portrait`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description, userId, projectId })
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.url;
+};
+
 export const generateStoryboardImage = async (
     scene: Scene,
     aspectRatio: AspectRatio,
     visualAnchorDataUrl?: string,
+    characterReferenceUrl?: string, // [NEW]
     userId?: string,
     projectId?: string
 ): Promise<string | null> => {
     const response = await fetch(`${API_BASE}/generate/storyboard`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scene, aspectRatio, visualAnchorDataUrl, userId, projectId })
+        body: JSON.stringify({ scene, aspectRatio, visualAnchorDataUrl, characterReferenceUrl, userId, projectId })
     });
     if (!response.ok) return null;
     const data = await response.json();

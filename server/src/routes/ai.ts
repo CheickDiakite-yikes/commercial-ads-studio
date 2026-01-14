@@ -26,10 +26,32 @@ router.post('/generate/plan', async (req, res) => {
     }
 });
 
+router.post('/generate/portrait', async (req, res) => {
+    try {
+        const { description, userId, projectId } = req.body;
+        const dataUrl = await import('../services/gemini').then(m => m.generateCharacterPortrait(description));
+
+        if (!dataUrl) {
+            return res.status(500).json({ error: 'Character portrait generation failed' });
+        }
+
+        if (userId && projectId) {
+            const fileUrl = saveAsset(dataUrl, userId, projectId, 'character_anchor');
+            if (fileUrl) {
+                return res.json({ url: fileUrl });
+            }
+        }
+        res.json({ url: dataUrl });
+    } catch (error) {
+        console.error('Portrait error:', error);
+        res.status(500).json({ error: 'Portrait generation failed' });
+    }
+});
+
 router.post('/generate/storyboard', async (req, res) => {
     try {
-        const { scene, aspectRatio, visualAnchorDataUrl, userId, projectId } = req.body;
-        const dataUrl = await generateStoryboardImage(scene, aspectRatio, visualAnchorDataUrl);
+        const { scene, aspectRatio, visualAnchorDataUrl, characterReferenceUrl, userId, projectId } = req.body;
+        const dataUrl = await generateStoryboardImage(scene, aspectRatio, visualAnchorDataUrl, characterReferenceUrl);
 
         if (!dataUrl) {
             return res.status(500).json({ error: 'Storyboard generation failed' });
